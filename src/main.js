@@ -25,9 +25,9 @@ function mkPuz(fns,x){ // fns listed outermost -> innermost
    o?`Now treat your result as the new input for ${o.n}, i.e. ${o.n}(□) = ${o.sub('□')}. Keep moving outward until you finish with ${fns[0].n}.`:`Do the multiplication first, then the addition or subtraction: ${i.sub(x)}.`]}}
 }
 const QD=[
- [['explore','Explore the Forgotten Forest'],['chest','Unlock the Wooden Treasure Chest'],['key','Obtain the Forest Key'],['door','Unlock the Forest Exit Door'],['next','Enter the exit portal']],
- [['explore','Explore the Crystal Cavern'],['chest','Solve the Crystal Chest puzzle'],['key','Obtain the Crystal Key'],['door','Unlock the Cavern Exit Door'],['next','Enter the exit portal']],
- [['explore','Enter the Final Vault'],['chest','Solve the Vault Chest 3-function puzzle'],['key','Obtain the Vault Key'],['door','Unlock the Final Vault Door'],['treasure','Claim the Legendary Treasure']]
+ [['explore','Explore the Forgotten Forest'],['find','Discover the hidden Forest Chest'],['chest','Unlock the Wooden Treasure Chest'],['key','Obtain the Forest Key'],['door','Unlock the Forest Exit Door'],['next','Enter the exit portal']],
+ [['explore','Explore the Crystal Cavern'],['find','Discover the hidden Crystal Grotto'],['chest','Solve the Crystal Chest puzzle'],['key','Obtain the Crystal Key'],['door','Unlock the Cavern Exit Door'],['next','Enter the exit portal']],
+ [['explore','Enter the Final Vault'],['find','Uncover the Secret Treasury Vault'],['chest','Solve the Vault Chest 3-function puzzle'],['key','Obtain the Vault Key'],['door','Unlock the Final Vault Door'],['treasure','Claim the Legendary Treasure']]
 ];
 
 /* ===== audio ===== */
@@ -48,7 +48,10 @@ const SFX={
  keyGet:()=>[659,880,1047,1319,1568].forEach((f,i)=>tone(f,.42,'sine',.16,i*.07)),
  door:()=>{nz(1.4,.45,320);tone(78,1.4,'sawtooth',.12,0,45)},
  win:()=>[523,659,784,1047,1319,1568].forEach((f,i)=>tone(f,1.2,'triangle',.2,i*.15)),
- chest:()=>{nz(.65,.35,850);tone(190,.85,'sawtooth',.1,0,390)}
+ chest:()=>{nz(.65,.35,850);tone(190,.85,'sawtooth',.1,0,390)},
+ nearChime0:()=>{tone(659,.35,'sine',.06);tone(988,.45,'sine',.05,.08);tone(1318,.55,'sine',.04,.16)},
+ nearChime1:()=>{tone(587,.5,'triangle',.05);tone(880,.6,'triangle',.04,.1);tone(1175,.7,'sine',.03,.2)},
+ nearChime2:()=>{tone(440,.7,'sine',.07);tone(554,.8,'sine',.06,.12);tone(659,1.0,'sine',.05,.25)}
 };
 const sfx=n=>{au();SFX[n]&&SFX[n]()};
 setInterval(()=>{if(!AC||mute)return;const l=G.on?G.lv:0,sc=[[220,247,277,330,370,440],[196,220,233,294,349,392],[110,131,147,165,196,220]][l],f=sc[RI(0,5)];
@@ -318,10 +321,14 @@ function buildKeyMesh(levelIdx){
  return g;
 }
 
-function buildTreasureChest(x,z,levelIdx){
+function buildTreasureChest(x,z,levelIdx,yaw=0,camOff=null){
  const g=new THREE.Group();
  g.position.set(x,0,z);
  W.add(g);
+
+ const boxGroup=new THREE.Group();
+ boxGroup.rotation.y=yaw;
+ g.add(boxGroup);
 
  const woodTex=mkWoodTex('#7c4823','#48260e','#613617');
  const darkWoodTex=mkWoodTex('#583115','#341b09','#47260f');
@@ -332,7 +339,7 @@ function buildTreasureChest(x,z,levelIdx){
  const metalMat=new THREE.MeshStandardMaterial({color:brassColor,metalness:.86,roughness:.25,emissive:0x2b1d04,emissiveIntensity:.2});
  const velvetMat=new THREE.MeshStandardMaterial({color:[0x6c1822,0x16395c,0x6e1414][levelIdx],roughness:.95});
 
- const addPart=(geo,mat,px,py,pz,parent=g,rx=0,ry=0,rz=0)=>{
+ const addPart=(geo,mat,px,py,pz,parent=boxGroup,rx=0,ry=0,rz=0)=>{
   const m=new THREE.Mesh(geo,mat);
   m.position.set(px,py,pz);m.rotation.set(rx,ry,rz);
   m.castShadow=true;m.receiveShadow=true;
@@ -372,13 +379,13 @@ function buildTreasureChest(x,z,levelIdx){
  // rear hinges (2 detailed hinges connecting base & lid)
  [-.72,.72].forEach(hx=>{
   addPart(new THREE.BoxGeometry(.24,.32,.07),ironMat,hx,by+.86,-.78);
-  addPart(new THREE.CylinderGeometry(.055,.055,.28,10),metalMat,hx,by+.98,-.76,g,0,0,Math.PI/2);
+  addPart(new THREE.CylinderGeometry(.055,.055,.28,10),metalMat,hx,by+.98,-.76,boxGroup,0,0,Math.PI/2);
  });
 
  // arched barrel lid pivoting at rear hinge (0, by+0.96, -0.75)
  const lid=new THREE.Group();
  lid.position.set(0,by+.96,-.75);
- g.add(lid);
+ boxGroup.add(lid);
 
  // half-cylinder barrel arch centered at (0, 0, +0.75) inside lid group
  const arch=new THREE.Mesh(new THREE.CylinderGeometry(.75,.75,2.38,18,1,false,0,Math.PI),woodMat);
@@ -400,7 +407,7 @@ function buildTreasureChest(x,z,levelIdx){
  addPart(new THREE.BoxGeometry(.44,.42,.07),ironMat,0,by+.76,.78);
  const padlock=new THREE.Group();
  padlock.position.set(0,by+.72,.86);
- g.add(padlock);
+ boxGroup.add(padlock);
  const shackle=new THREE.Mesh(new THREE.TorusGeometry(.11,.028,8,16,Math.PI),ironMat);
  shackle.position.set(0,.13,0);shackle.castShadow=true;padlock.add(shackle);
  const lockBody=addPart(new THREE.BoxGeometry(.28,.3,.13),metalMat,0,-.04,0,padlock);
@@ -409,9 +416,9 @@ function buildTreasureChest(x,z,levelIdx){
 
  // glowing lock status light & interior treasure glow light
  const lockGlow=new THREE.PointLight(0xffaa33,.9,9);
- lockGlow.position.set(0,by+1.1,1.35);g.add(lockGlow);
+ lockGlow.position.set(0,by+1.1,1.35);boxGroup.add(lockGlow);
  const innerGlow=new THREE.PointLight(LV[levelIdx].kc,0,10);
- innerGlow.position.set(0,by+.8,0);g.add(innerGlow);
+ innerGlow.position.set(0,by+.8,0);boxGroup.add(innerGlow);
 
  // 3D Key nested inside chest (initially hidden until chest opens)
  const keyMesh=buildKeyMesh(levelIdx);
@@ -425,12 +432,13 @@ function buildTreasureChest(x,z,levelIdx){
  for(let i=0;i<spN;i++){spPos[i*3]=(Math.random()-.5)*1.4;spPos[i*3+1]=by+.3+Math.random()*.5;spPos[i*3+2]=(Math.random()-.5)*.9}
  spGeo.setAttribute('position',new THREE.BufferAttribute(spPos,3));
  const spMat=new THREE.PointsMaterial({color:LV[levelIdx].kc,size:.22,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
- const sparks=new THREE.Points(spGeo,spMat);g.add(sparks);
+ const sparks=new THREE.Points(spGeo,spMat);boxGroup.add(sparks);
 
  // solid collision box matching chest footprint
- box(x,z,1.45,1.0,2.4);
+ const isTurned=Math.abs(Math.sin(yaw))>0.5;
+ box(x,z,isTurned?1.05:1.45,isTurned?1.45:1.05,2.4);
 
- return{group:g,x,z,lid,padlock,shackle,lockBody,lockGlow,innerGlow,keyMesh,sparks,spMat,spPos,spN,by};
+ return{group:g,boxGroup,x,z,yaw,camOff,lid,padlock,shackle,lockBody,lockGlow,innerGlow,keyMesh,sparks,spMat,spPos,spN,by};
 }
 
 function buildExitDoor(levelIdx){
@@ -481,7 +489,7 @@ function buildExitDoor(levelIdx){
 /* ===== level building ===== */
 let r=Math.random;
 const KP=[];const free=(x,z,m=5)=>Math.abs(x)>4&&Math.abs(z+10)>3&&KP.every(p=>Math.hypot(x-p[0],z-p[1])>m);
-const INS=[[[-15,8]],[[-17,6],[17,-3]],[[-20,-2],[20,-2],[0,16]]],MP=[[6,-3],[0,0],[0,5]];
+const INS=[[[-15,8]],[[-17,6],[17,-3]],[[-20,-2],[20,-2],[0,16]]],MP=[[18,-2],[21,5],[-22,10]];
 
 function pts(n,sp,c,s,y0,y1){
  const g=new THREE.BufferGeometry(),a=new Float32Array(n*3);
@@ -553,10 +561,21 @@ function build(i){
   });
  });
 
- // wooden treasure chest (replaces old puzzle mechanism as the math puzzle object)
+ // wooden treasure chest (hidden in progressive secret locations)
  const [mx,mz]=MP[i];
- CHEST=buildTreasureChest(mx,mz,i);
- const chestIt=inter(mx,mz,'Wooden Treasure Chest — Locked (Solve Puzzle)',()=>{
+ const chestYaws=[-Math.PI*0.45,-Math.PI*0.5,Math.PI*0.5];
+ const chestCamOffs=[
+  new THREE.Vector3(-2.8,2.4,2.0),
+  new THREE.Vector3(-2.8,2.4,1.8),
+  new THREE.Vector3(3.2,2.6,0.2)
+ ];
+ CHEST=buildTreasureChest(mx,mz,i,chestYaws[i],chestCamOffs[i]);
+ const chestLabels=[
+  'Hidden Forest Chest — Locked (Solve Puzzle)',
+  'Hidden Crystal Chest — Locked (Solve Puzzle)',
+  'Secret Vault Chest — Locked (Solve Puzzle)'
+ ];
+ const chestIt=inter(mx,mz,chestLabels[i],()=>{
   if(G.chestState==='opened'){toast(`Chest already opened — ${L.kn} already obtained.`);return}
   if(G.chestState==='opening')return;
   openPuz('main');
@@ -633,9 +652,10 @@ function build(i){
 }
 
 function d0(){
- scatter(60,5,(x,z)=>tree(x,z,.8+r()*.7),(x,z)=>x<-20&&Math.abs(z-2)<7);
- scatter(16,4,(x,z)=>{const s=.8+r()*1.2,m=mesh(new THREE.DodecahedronGeometry(s,0),M(0x6b7066),x,s*.6,z);m.rotation.set(r()*3,r()*3,0);circ(x,z,s*.85,2)});
- scatter(50,2.5,(x,z)=>{const c=r()<.5?0x4de0ff:0xff7ad9,m=mesh(new THREE.ConeGeometry(.25,.9,5),M(c,{emissive:c,emissiveIntensity:1.5}),x,.45,z,false);ANI.push(t=>m.material.emissiveIntensity=1.2+Math.sin(t*2+x)*.6)});
+ // Scatter trees excluding western waterfall and eastern hidden forest alcove
+ scatter(58,5,(x,z)=>tree(x,z,.8+r()*.7),(x,z)=>(x<-20&&Math.abs(z-2)<7)||(x>12&&z>-8&&z<6));
+ scatter(15,4,(x,z)=>{const s=.8+r()*1.2,m=mesh(new THREE.DodecahedronGeometry(s,0),M(0x6b7066),x,s*.6,z);m.rotation.set(r()*3,r()*3,0);circ(x,z,s*.85,2)},(x,z)=>(x>12&&z>-8&&z<6));
+ scatter(45,2.5,(x,z)=>{const c=r()<.5?0x4de0ff:0xff7ad9,m=mesh(new THREE.ConeGeometry(.25,.9,5),M(c,{emissive:c,emissiveIntensity:1.5}),x,.45,z,false);ANI.push(t=>m.material.emissiveIntensity=1.2+Math.sin(t*2+x)*.6)},(x,z)=>(x>12&&z>-8&&z<6));
  const mo=M(0x5f7a50);[[-18,5,3,.5,2],[-12,11,.5,2.5,1.5],[-18,11,2,.5,2.4]].forEach(([x,z,hx,hz,h])=>{mesh(new THREE.BoxGeometry(hx*2,h,hz*2),mo,x,h/2,z);box(x,z,hx,hz,h)});
  [[11,13],[17,13],[11,19],[17,19]].forEach(([x,z])=>{mesh(new THREE.CylinderGeometry(.6,.7,5,8),mo,x,2.5,z);circ(x,z,.7)});mesh(new THREE.BoxGeometry(8,.6,3),mo,14,5.3,13);mesh(new THREE.BoxGeometry(8,.3,8),M(0x7a8470),14,.15,16);
  for(let z=26;z>-26;z-=2.2)if(Math.abs(z+10)>1.4)mesh(new THREE.BoxGeometry(2.4,.1,1.6),M(0x8a8f80),(r()-.5)*.6,.05,z,false);
@@ -644,21 +664,67 @@ function d0(){
  const wf=new THREE.Mesh(new THREE.PlaneGeometry(7,14),new THREE.MeshBasicMaterial({map:tx,transparent:true,opacity:.75}));wf.rotation.y=Math.PI/2;wf.position.set(-28.4,7,2);W.add(wf);ANI.push((t,dt)=>tx.offset.y+=dt*1.2);
  mesh(new THREE.BoxGeometry(3,16,16),M(0x56604f),-30,8,2);
  const pd=new THREE.Mesh(new THREE.CircleGeometry(4.5,24),new THREE.MeshStandardMaterial({color:0x2a8fc0,transparent:true,opacity:.7,metalness:.5,roughness:.2}));pd.rotation.x=-Math.PI/2;pd.position.set(-24,.06,2);W.add(pd);
- pts(110,27,0xd8ff70,.18,.5,6);
+ pts(90,27,0xd8ff70,.18,.5,6);
+
+ // ===== Hidden Forest Alcove (Easy - Level 1) =====
+ const mossRock=M(0x56604f);
+ const r1=mesh(new THREE.DodecahedronGeometry(2.4,0),mossRock,18,1.4,2.2);r1.rotation.set(.4,.8,.2);circ(18,2.2,2.0,4);
+ const r2=mesh(new THREE.DodecahedronGeometry(2.7,0),mossRock,21.8,1.6,-2);r2.rotation.set(-.3,1.2,.5);circ(21.8,-2,2.3,5);
+ const r3=mesh(new THREE.DodecahedronGeometry(2.4,0),mossRock,18.2,1.3,-6.2);r3.rotation.set(.6,-.4,.3);circ(18.2,-6.2,2.0,4);
+ const rRoof=mesh(new THREE.BoxGeometry(4.4,.9,5.4),mossRock,19.6,4.0,-2);rRoof.rotation.set(.1,.2,-.15);
+ tree(21.2,1.8,1.35);tree(17.2,-7.0,1.3);tree(22.0,-5.8,1.25);
+ // Stepping stones trail (clear environmental clue)
+ const stepMat=M(0x73796a);
+ [[5,4.5],[7.5,3.2],[10.2,2.0],[12.8,0.8],[15.2,-0.4],[17.0,-1.2]].forEach(([sx,sz],idx)=>{
+  const st=mesh(new THREE.CylinderGeometry(.68-idx*.03,.75-idx*.03,.1,8),stepMat,sx,.06,sz,false);st.rotation.y=idx*.6;
+ });
+ // Cairn & glowing lantern at trail split
+ const cairnMat=M(0x82887a);
+ mesh(new THREE.CylinderGeometry(.38,.45,.35,7),cairnMat,9.8,.2,3.2);mesh(new THREE.CylinderGeometry(.28,.34,.3,7),cairnMat,9.8,.52,3.2);mesh(new THREE.DodecahedronGeometry(.2,0),cairnMat,9.8,.78,3.2);
+ const cLight=new THREE.PointLight(0xffe277,.8,7);cLight.position.set(9.8,1.1,3.2);W.add(cLight);
+ mesh(new THREE.BoxGeometry(.24,.32,.24),M(0xffdf88,{emissive:0xffaa22,emissiveIntensity:1.3}),9.8,1.05,3.2,false);
+ // Soft warm illumination inside the nook
+ const alcLight=new THREE.PointLight(0xffdf80,.95,9);alcLight.position.set(17.6,2.0,-2.0);W.add(alcLight);
+ // Fireflies floating around the alcove
+ pts(36,5,0xd4ff60,.16,.4,3.2);
 }
+
 function d1(){
  const cc=[0x39a7ff,0x5fe0ff,0x7a6bff];
- scatter(36,4,(x,z)=>{for(let j=0;j<3;j++){const s=.7+r()*1.5,c=cc[j],m=mesh(new THREE.ConeGeometry(s*.4,s*2.4,6),M(c,{emissive:c,emissiveIntensity:.9,metalness:.4,roughness:.2}),x+r()*1.6-.8,s*1.1,z+r()*1.6-.8);m.rotation.set(r()*.6-.3,0,r()*.6-.3)}circ(x,z,1,3)});
+ scatter(32,4,(x,z)=>{for(let j=0;j<3;j++){const s=.7+r()*1.5,c=cc[j],m=mesh(new THREE.ConeGeometry(s*.4,s*2.4,6),M(c,{emissive:c,emissiveIntensity:.9,metalness:.4,roughness:.2}),x+r()*1.6-.8,s*1.1,z+r()*1.6-.8);m.rotation.set(r()*.6-.3,0,r()*.6-.3)}circ(x,z,1,3)},(x,z)=>x>12&&z>0&&z<11);
  [[-10,3,10],[12,3,8],[-6,3,-4],[8,3,-20],[0,3,22]].forEach(([x,y,z])=>{const l=new THREE.PointLight(0x4aa8ff,1.6,28);l.position.set(x,y,z);W.add(l)});
- scatter(22,3,(x,z)=>{const s=.6+r()*1.2;mesh(new THREE.ConeGeometry(s,s*3,6),M(0x3a4660),x,s*1.5,z);circ(x,z,s*.8,3)});
+ scatter(20,3,(x,z)=>{const s=.6+r()*1.2;mesh(new THREE.ConeGeometry(s,s*3,6),M(0x3a4660),x,s*1.5,z);circ(x,z,s*.8,3)},(x,z)=>x>12&&z>0&&z<11);
  for(let k=0;k<30;k++){const s=.6+r()*1.4;mesh(new THREE.ConeGeometry(s,s*4,6),M(0x2a3550),r()*60-30,19-s*2,r()*60-30,false).rotation.x=Math.PI}
  const cl=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshBasicMaterial({color:0x050a18}));cl.rotation.x=Math.PI/2;cl.position.y=19;W.add(cl);
  const pl=new THREE.Mesh(new THREE.PlaneGeometry(14,9),new THREE.MeshStandardMaterial({color:0x1f6fb5,transparent:true,opacity:.75,metalness:.6,roughness:.1,emissive:0x0a3a66}));pl.rotation.x=-Math.PI/2;pl.position.set(-13,.05,16);W.add(pl);ANI.push(t=>pl.material.emissiveIntensity=.7+Math.sin(t*1.5)*.3);
  for(let x=-19;x<-6;x+=1.8)mesh(new THREE.BoxGeometry(1.6,.25,3.2),M(0x6a7388),x,.25,16);
  [[13,14],[-8,-4],[20,-16]].forEach(([x,z],i)=>{const g=new THREE.Group();g.position.set(x,2.4,z);W.add(g);const tr=new THREE.Mesh(new THREE.TorusGeometry(1.5,.3,8,16),M(0x8a7a5a,{metalness:.6}));g.add(tr);for(let k=0;k<3;k++){const b=new THREE.Mesh(new THREE.BoxGeometry(3,.25,.3),M(0x8a7a5a));b.rotation.z=k*Math.PI/3;g.add(b)}g.castShadow=true;mesh(new THREE.BoxGeometry(1,2.4,1),M(0x4a5068),x,1.2,z);circ(x,z,1);ANI.push((t,dt)=>g.rotation.z+=dt*(i%2?-.6:.6))});
  [-11,11].forEach(x=>{mesh(new THREE.CylinderGeometry(.7,.8,5.5,8),M(0x4a5068),x,2.75,-4);circ(x,-4,.8)});mesh(new THREE.BoxGeometry(24,.8,1.6),M(0x4a5068),0,5.9,-4);
- pts(120,27,0x7ad0ff,.14,0,12);
+ pts(100,27,0x7ad0ff,.14,0,12);
+
+ // ===== Hidden Crystal Grotto (Medium - Level 2) =====
+ const crMat1=M(0x39a7ff,{emissive:0x2070ff,emissiveIntensity:.9,metalness:.5,roughness:.2});
+ const crMat2=M(0x9a5cff,{emissive:0x7030e0,emissiveIntensity:.85,metalness:.5,roughness:.2});
+ const rockWallMat=M(0x2a3550);
+ // Towering crystal columns forming the S-curved fissure entrance
+ const colA=mesh(new THREE.ConeGeometry(1.4,7.5,6),crMat1,16.5,3.75,2.2);colA.rotation.set(-.15,.4,.1);circ(16.5,2.2,1.3,8);
+ const colB=mesh(new THREE.ConeGeometry(1.5,8.0,6),rockWallMat,16.0,4.0,5.0);colB.rotation.set(.1,-.3,-.1);circ(16.0,5.0,1.4,8);
+ const colC=mesh(new THREE.ConeGeometry(1.3,6.8,6),crMat2,17.5,3.4,8.4);colC.rotation.set(.2,.6,-.15);circ(17.5,8.4,1.2,7);
+ // Cavern enclosure walls
+ mesh(new THREE.BoxGeometry(1.6,8,8),rockWallMat,24.2,4,5);box(24.2,5,.8,4,8);
+ mesh(new THREE.BoxGeometry(7,8,1.6),rockWallMat,21,4,1.2);box(21,1.2,3.5,.8,8);
+ mesh(new THREE.BoxGeometry(7,8,1.6),rockWallMat,21,4,9.2);box(21,9.2,3.5,.8,8);
+ // Distinctive crystal cluster at entrance
+ const clu=mesh(new THREE.DodecahedronGeometry(.75,0),crMat1,13.5,.6,8.4);clu.rotation.set(.3,.5,.2);
+ // Glowing crystal nodes on cavern floor along the path
+ [[12.5,8.4],[14.8,8.0],[17.2,7.2],[19.2,6.0]].forEach(([cx,cz],i)=>{
+  const sp=mesh(new THREE.ConeGeometry(.25,.7,5),i%2?crMat1:crMat2,cx,.35,cz,false);sp.rotation.set(i%2?.3:-.2,0,i%2?-.2:.3);
+ });
+ // Ethereal azure glow inside grotto
+ const grottoLight=new THREE.PointLight(0x44c0ff,1.3,9.5);grottoLight.position.set(20.5,2.5,5.0);W.add(grottoLight);
+ pts(35,5,0x7be8ff,.15,.5,4.0);
 }
+
 function d2(){
  const gold=M(0xd4a537,{metalness:.7,roughness:.3,emissive:0x3a2a05}),st=M(0x6b6252);
  mesh(new THREE.BoxGeometry(4,.06,35),M(0x7a1f1f),0,.04,8.5,false);[-2.15,2.15].forEach(x=>mesh(new THREE.BoxGeometry(.3,.07,35),gold,x,.06,8.5,false));
@@ -670,7 +736,42 @@ function d2(){
  for(let k=0;k<14;k++){const a=k/14*6.28;mesh(new THREE.DodecahedronGeometry(.4+r()*.4,0),gold,Math.cos(a)*6.4,.3,-20+Math.sin(a)*6.4)}
  [[-6,-16],[6,-16],[-6,-24],[6,-24]].forEach(([x,z])=>pillar(x,z,gold,7));
  const cl=new THREE.PointLight(0xffc860,1.4,34);cl.position.set(0,7,-20);W.add(cl);
- pts(90,27,0xffd36a,.12,0,10);
+ pts(80,27,0xffd36a,.12,0,10);
+
+ // ===== Secret Treasury Vault Chamber (Hard - Level 3) =====
+ const wallMat=M(0x5a4f42,{roughness:.8});
+ const goldTrimMat=M(0xd4a537,{metalness:.85,roughness:.25});
+ // Gilded screen partitions along x = -17
+ mesh(new THREE.BoxGeometry(1.2,6.5,6.8),wallMat,-17,3.25,4.4);box(-17,4.4,.6,3.4,6.5);
+ mesh(new THREE.BoxGeometry(1.2,6.5,6.8),wallMat,-17,3.25,15.6);box(-17,15.6,.6,3.4,6.5);
+ mesh(new THREE.BoxGeometry(1.4,.4,6.8),goldTrimMat,-17,6.3,4.4);
+ mesh(new THREE.BoxGeometry(1.4,.4,6.8),goldTrimMat,-17,6.3,15.6);
+ // North & South enclosure walls for secret treasury
+ mesh(new THREE.BoxGeometry(9.5,6.5,1.2),wallMat,-22,3.25,1.0);box(-22,1.0,4.75,.6,6.5);
+ mesh(new THREE.BoxGeometry(9.5,6.5,1.2),wallMat,-22,3.25,19.0);box(-22,19.0,4.75,.6,6.5);
+ // Doorway header cornice at x = -17, z = 10
+ mesh(new THREE.BoxGeometry(1.4,1.2,4.4),goldTrimMat,-17,6.0,10);
+ // Royal ceremonial braziers with violet-gold flame (subtle environmental clue)
+ [7.6,12.4].forEach((bz,bi)=>{
+  mesh(new THREE.CylinderGeometry(.45,.35,1.8,8),goldTrimMat,-17,.9,bz);
+  mesh(new THREE.CylinderGeometry(.65,.45,.5,8),goldTrimMat,-17,1.95,bz);
+  const fl=mesh(new THREE.ConeGeometry(.3,.8,6),M(0xc07aff,{emissive:0x9933ff,emissiveIntensity:2.2}),-17,2.4,bz,false);
+  const bl=new THREE.PointLight(0xb066ff,1.4,9);bl.position.set(-17,2.7,bz);W.add(bl);
+  ANI.push(t=>{fl.scale.y=1+Math.sin(t*12+bi)*.15;bl.intensity=1.3+Math.sin(t*8+bi)*.25});
+  circ(-17,bz,.65,2.5);
+ });
+ // Polished gold floor inlay leading from colonnade into the secret chamber
+ mesh(new THREE.BoxGeometry(4.2,.05,.8),goldTrimMat,-14.8,.04,10,false);
+ const ringMed=new THREE.Mesh(new THREE.RingGeometry(1.2,1.5,32),goldTrimMat);ringMed.rotation.x=-Math.PI/2;ringMed.position.set(-22,.05,10);W.add(ringMed);
+ // Ancient golden urns
+ [[-25,4],[-25,16],[-19,4],[-19,16]].forEach(([ux,uz])=>{
+  mesh(new THREE.CylinderGeometry(.35,.5,1.2,8),goldTrimMat,ux,.6,uz);
+  mesh(new THREE.SphereGeometry(.45,8,8),goldTrimMat,ux,1.2,uz);
+  circ(ux,uz,.55,1.8);
+ });
+ // Sacred treasury warm light
+ const vaultLight=new THREE.PointLight(0xffd24c,1.3,11);vaultLight.position.set(-22,3.2,10);W.add(vaultLight);
+ pts(30,4.5,0xffd24c,.14,.6,3.5);
 }
 
 /* ===== game flow ===== */
@@ -692,7 +793,12 @@ async function startLevel(i){
   pb.style.width='60%';await fr();
   build(i);pb.style.width='100%';await fr();
   hudUpd();ui(null);
-  toast(`Find the Wooden Treasure Chest and solve the Level ${i+1} puzzle!`);
+  const startToasts=[
+   'Explore the Forgotten Forest to find the hidden Wooden Treasure Chest!',
+   'Search the deep Crystal Cavern to discover the hidden Crystal Grotto!',
+   'Uncover the secret chamber hidden within the Final Vault!'
+  ];
+  toast(startToasts[i]);
   save();
  }catch(e){
   console.error(e);$('lt').textContent='Error: '+e.message;$('lerr').style.display='inline-block';
@@ -952,10 +1058,27 @@ function tick(){
    if(GATE_T>=1){GATE_T=1;doorOpened()}
   }
 
+  // Hidden chest discovery & ambient proximity chime
+  if(CHEST&&G.chestState==='locked'&&ST==='play'){
+   const cd=Math.hypot(P.x-CHEST.x,P.z-CHEST.z);
+   const discRange=[9.0,8.0,7.0][G.lv];
+   if(!G.q.find&&cd<discRange){
+    q('find');
+    sfx('nearChime'+G.lv);
+   }
+   if(cd<discRange+3.5){
+    if(!G.lastChimeT||t-G.lastChimeT>5.5){
+     G.lastChimeT=t;
+     sfx('nearChime'+G.lv);
+    }
+   }
+  }
+
   let tg=new THREE.Vector3(P.x,P.y+1.7,P.z),want;
   if(G.cine&&CHEST){
    tg.set(CHEST.x,1.35,CHEST.z);
-   want=new THREE.Vector3(CHEST.x+2.6,3.2,CHEST.z+4.8);
+   const co=CHEST.camOff||new THREE.Vector3(2.6,3.2,4.8);
+   want=new THREE.Vector3(CHEST.x+co.x,co.y,CHEST.z+co.z);
   }else{
    const cp=Math.cos(pitch);let d=7;
    for(;d>1.2;d-=.4){
