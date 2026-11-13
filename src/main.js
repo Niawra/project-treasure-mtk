@@ -10,9 +10,9 @@ const KEY_SVG='<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" s
 /* ===== math / puzzles ===== */
 const F=(n,a,b)=>({n,a,b,ap:x=>a*x+b,rhs:`${a==1?'':a}x ${b<0?'− '+(-b):'+ '+b}`,txt:`${n}(x) = ${a==1?'':a}x ${b<0?'− '+(-b):'+ '+b}`,sub:v=>`${a==1?v:a+'('+v+')'} ${b<0?'− '+(-b):'+ '+b}`});
 const LV=[
- {n:'The Forgotten Forest',d:'Easy',kn:'Forest Key',kc:0xffd24c,fs:[F('f',2,3)],xr:[2,9],bg:'linear-gradient(#7fb069,#1f3a2b)'},
- {n:'The Crystal Cavern',d:'Medium',kn:'Crystal Key',kc:0x7be8ff,fs:[F('f',2,3),F('g',1,-1)],xr:[2,9],bg:'linear-gradient(#4aa8ff,#0b1230)'},
- {n:'The Final Vault',d:'Hard',kn:'Vault Key',kc:0xffe066,fs:[F('f',2,1),F('g',1,3),F('h',3,-2)],xr:[1,6],bg:'linear-gradient(#e0b23c,#2a1c08)'}
+ {n:'The Forgotten Forest',d:'Easy',kn:'Forest Key',kc:0xffd24c,fs:[F('f',2,3)],x:5,bg:'linear-gradient(#7fb069,#1f3a2b)'},
+ {n:'The Crystal Cavern',d:'Medium',kn:'Crystal Key',kc:0x7be8ff,fs:[F('f',2,3),F('g',1,-1)],x:4,bg:'linear-gradient(#4aa8ff,#0b1230)'},
+ {n:'The Final Vault',d:'Hard',kn:'Vault Key',kc:0xffe066,fs:[F('f',2,1),F('g',1,3),F('h',3,-2)],x:2,bg:'linear-gradient(#e0b23c,#2a1c08)'}
 ];
 function mkPuz(fns,x){ // fns listed outermost -> innermost
  let v=x;for(let i=fns.length-1;i>=0;i--)v=fns[i].ap(v);
@@ -193,7 +193,7 @@ $('mu').onchange=e=>{mute=e.target.checked;vol()};
 function openPuz(kind){
  const L=LV[G.lv];G.pzs=G.pzs||{};let pz=G.pzs[kind];
  if(!pz){
-  pz=G.pzs[kind]=mkPuz(L.fs,RI(...L.xr));
+  pz=G.pzs[kind]=mkPuz(L.fs,L.x);
   pz.kind=kind;
   pz.title=['Wooden Chest Lock — Level 1','Crystal Chest Lock — Level 2','Vault Chest Lock — Level 3'][G.lv];
   pz.fl=[
