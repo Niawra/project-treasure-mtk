@@ -174,7 +174,8 @@ const ACT={
  pause(){pause()},
  resume(){resume()},
  restart(){startLevel(G.lv)},
- replay(){SV.run={t:0,h:0};SV.frags=[];startLevel(0)}
+ replay(){SV.run={t:0,h:0};SV.frags=[];startLevel(0)},
+ claim(){claimTreasure()}
 };
 document.addEventListener('click',e=>{
  const b=e.target.closest('[data-a]');if(!b)return;au();
@@ -237,8 +238,130 @@ function submit(){
   setTimeout(()=>$('ans')&&$('ans').focus(),20);return;
  }
  G.busy=true;sfx('ok');flash();
- $('msg').className='ok';$('msg').textContent='Correct! Unlocking the Wooden Treasure Chest…';
- setTimeout(()=>{ui(null);try{cv.requestPointerLock()}catch(e){}beginChestOpen()},850);
+ $('msg').className='ok';$('msg').textContent='Correct! Membuka Solution Walkthrough…';
+ setTimeout(()=>{
+  ui('sol');
+  renderSolutionWalkthrough(pz);
+  G.busy=false;
+ },600);
+}
+
+function claimTreasure(){
+ ui(null);
+ try{cv.requestPointerLock()}catch(e){}
+ beginChestOpen();
+}
+
+function renderSolutionWalkthrough(pz){
+ const lvIdx=G.lv,L=LV[lvIdx],count=pz.fns.length;
+ let conceptTitle='',conceptDesc='';
+ if(count===1){
+  conceptTitle='Konsep: Evaluasi Fungsi Tunggal';
+  conceptDesc='Pada fungsi tunggal <i>f(x)</i>, kita mencari nilai output dengan melakukan substitusi langsung nilai input <b>x</b> ke dalam rumus fungsi, lalu menghitung perkalian dan penjumlahan sesuai aturan aritmatika.';
+ }else if(count===2){
+  conceptTitle='Konsep: Komposisi Dua Fungsi (f ∘ g)(x)';
+  conceptDesc='Komposisi fungsi <b>(f ∘ g)(x)</b> didefinisikan sebagai <b>f(g(x))</b>. Prinsip utama penyelesaiannya adalah <b>Inside-Out</b> (dari dalam ke luar). Kita harus mencari nilai fungsi terdalam <i>g(x)</i> terlebih dahulu, lalu nilai hasilnya dimasukkan sebagai input (argumen) untuk fungsi terluar <i>f(x)</i>.';
+ }else{
+  conceptTitle='Konsep: Komposisi Tiga Fungsi (f ∘ g ∘ h)(x)';
+  conceptDesc='Komposisi tiga fungsi <b>(f ∘ g ∘ h)(x)</b> bermakna <b>f(g(h(x)))</b>. Pengerjaan dilakukan bertahap secara berantai dari lapisan terdalam ke terluar: hitung <i>h(x)</i> terlebih dahulu, substitusikan hasilnya ke <i>g(x)</i>, dan terakhir masukkan ke <i>f(x)</i>.';
+ }
+
+ const steps=[];let curVal=pz.x;
+ for(let s=0;s<count;s++){
+  const fnIdx=count-1-s,fn=pz.fns[fnIdx],inVal=curVal,outVal=fn.ap(inVal);
+  curVal=outVal;
+  let stepLabel='',stepDesc='',mathLines=[];
+  if(count===1){
+   stepLabel=`Langkah 1: Substitusi x = ${inVal} ke ${fn.n}(x)`;
+   stepDesc=`Masukkan nilai x = ${inVal} ke dalam fungsi <b>${fn.txt}</b>. Hitung hasil perkalian terlebih dahulu, kemudian jumlahkan.`;
+   mathLines.push(`${fn.n}(${inVal}) = ${fn.sub(inVal)}`);
+   if(fn.a!==1)mathLines.push(`     = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
+   mathLines.push(`     = ${outVal}`);
+  }else if(count===2){
+   if(s===0){
+    stepLabel=`Langkah 1: Evaluasi Fungsi Terdalam ${fn.n}(${inVal})`;
+    stepDesc=`Selesaikan fungsi yang berada di bagian terdalam, yaitu <b>${fn.n}(x)</b>, dengan mensubstitusikan nilai input x = ${inVal}.`;
+    mathLines.push(`${fn.n}(${inVal}) = ${fn.sub(inVal)}`);
+    if(fn.a!==1)mathLines.push(`     = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
+    mathLines.push(`     = ${outVal}`);
+   }else{
+    const innerFn=pz.fns[count-1];
+    stepLabel=`Langkah 2: Substitusi Hasil ${innerFn.n}(${pz.x}) ke Fungsi Terluar ${fn.n}(x)`;
+    stepDesc=`Gunakan hasil dari langkah 1 (<b>${innerFn.n}(${pz.x}) = ${inVal}</b>) sebagai input baru untuk fungsi terluar <b>${fn.txt}</b>.`;
+    mathLines.push(`f(g(${pz.x})) = ${fn.n}(${inVal})`);
+    mathLines.push(`        = ${fn.sub(inVal)}`);
+    if(fn.a!==1)mathLines.push(`        = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
+    mathLines.push(`        = ${outVal}`);
+   }
+  }else{
+   if(s===0){
+    stepLabel=`Langkah 1: Evaluasi Lapisan Terdalam ${fn.n}(${inVal})`;
+    stepDesc=`Mulai dari fungsi paling dalam <b>${fn.txt}</b> dengan mensubstitusikan nilai x = ${inVal}.`;
+    mathLines.push(`${fn.n}(${inVal}) = ${fn.sub(inVal)}`);
+    if(fn.a!==1)mathLines.push(`     = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
+    mathLines.push(`     = ${outVal}`);
+   }else if(s===1){
+    const innerFn=pz.fns[2];
+    stepLabel=`Langkah 2: Substitusi ke Lapisan Tengah ${fn.n}(x)`;
+    stepDesc=`Masukkan hasil dari lapisan terdalam (<b>${innerFn.n}(${pz.x}) = ${inVal}</b>) ke dalam fungsi perantara <b>${fn.txt}</b>.`;
+    mathLines.push(`g(h(${pz.x})) = ${fn.n}(${inVal})`);
+    mathLines.push(`        = ${fn.sub(inVal)}`);
+    if(fn.a!==1)mathLines.push(`        = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
+    mathLines.push(`        = ${outVal}`);
+   }else{
+    const midExpr=`g(h(${pz.x}))`;
+    stepLabel=`Langkah 3: Substitusi ke Lapisan Terluar ${fn.n}(x)`;
+    stepDesc=`Gunakan hasil dari komposisi perantara (<b>${midExpr} = ${inVal}</b>) sebagai argumen untuk fungsi terluar <b>${fn.txt}</b>.`;
+    mathLines.push(`f(g(h(${pz.x}))) = ${fn.n}(${inVal})`);
+    mathLines.push(`           = ${fn.sub(inVal)}`);
+    if(fn.a!==1)mathLines.push(`           = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
+    mathLines.push(`           = ${outVal}`);
+   }
+  }
+  steps.push({num:s+1,label:stepLabel,desc:stepDesc,math:mathLines.join('\n')});
+ }
+
+ const finalExpr=count===1?`f(${pz.x}) = ${pz.ans}`:`${pz.nt.split('=')[0].trim()} = ${pz.nest} = ${pz.ans}`;
+
+ $('sol-box').innerHTML=
+  `<div class="sol-header">`+
+   `<span class="sol-tag">Jawaban Terverifikasi Benar</span>`+
+   `<h2 class="sol-title">CORRECT ANSWER!</h2>`+
+   `<p class="sol-subtitle">SOLUTION WALKTHROUGH · LEVEL ${lvIdx+1} (${L.n})</p>`+
+  `</div>`+
+  `<div class="sol-card">`+
+   `<div class="sol-card-title"><span>📐</span> SOAL & FUNGSI YANG DIKETAHUI</div>`+
+   `<div class="sol-card-text">Evaluasi nilai: <b style="color:#ffe9a8">${pz.nt}</b> dengan input <b>x = ${pz.x}</b></div>`+
+   `<div class="sol-fns-grid">${pz.fns.map(f=>`<span class="sol-fn-badge">${f.txt}</span>`).join('')}</div>`+
+  `</div>`+
+  `<div class="sol-card">`+
+   `<div class="sol-card-title"><span>💡</span> ${conceptTitle}</div>`+
+   `<p class="sol-card-text">${conceptDesc}</p>`+
+  `</div>`+
+  `<div class="sol-steps-wrap">`+
+   `<div class="sol-steps-title">LANGKAH PENYELESAIAN SISTEMATIS</div>`+
+   `${steps.map(st=>`
+    <div class="sol-step">
+     <div class="sol-step-head"><span class="sol-step-num">Step ${st.num}</span><span class="sol-step-label">${st.label}</span></div>
+     <p class="sol-step-desc">${st.desc}</p>
+     <pre class="sol-math-box">${st.math}</pre>
+    </div>
+   `).join('')}`+
+  `</div>`+
+  `<div class="sol-result">`+
+   `<div class="sol-res-label">Hasil Akhir Perhitungan</div>`+
+   `<div class="sol-res-val">${finalExpr}</div>`+
+  `</div>`+
+  `<div class="sol-actions">`+
+   `<button class="btn-claim" id="btn-claim" data-a="claim">`+
+    `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>`+
+    ` CLAIM YOUR TREASURE`+
+   `</button>`+
+  `</div>`;
+
+ const b=$('btn-claim');
+ if(b)b.onclick=()=>claimTreasure();
+ setTimeout(()=>{if($('btn-claim'))$('btn-claim').focus()},60);
 }
 
 function flash(){const f=$('flash');f.style.transition='none';f.style.opacity=.8;requestAnimationFrame(()=>{f.style.transition='opacity .8s';f.style.opacity=0})}
@@ -915,6 +1038,7 @@ addEventListener('keydown',e=>{
   if(ST==='play')pause();else if(['puz','inv','quest','pause'].includes(ST))resume();
   return;
  }
+ if(ST==='sol'&&(c==='Enter'||c==='Space')){e.preventDefault();claimTreasure();return}
  if(['inv','quest'].includes(ST)&&(c==='KeyI'||c==='KeyQ')){resume();return}
  if(ST!=='play')return;
  if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(c)){K[c]=1;e.preventDefault()}
