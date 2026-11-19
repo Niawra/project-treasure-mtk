@@ -113,44 +113,166 @@ function formatLinearInverse(n,a,b){
  return `${n}⁻¹(x) = ${num} / ${a}`;
 }
 
+function sanitizeMathExpr(str){
+ if(!str || typeof str !== 'string') return '';
+ let s = str.trim();
+ s = s.replace(/^(?:[fghFGH](?:⁻¹|\^-1|-1|\^\{-1\}|\(-1\))?\(x\)|y|ans)\s*=\s*/i, '');
+ s = s.replace(/[−–—]/g, '-');
+ s = s.replace(/[×✕*]/g, '*');
+ s = s.replace(/[÷:]/g, '/');
+ s = s.replace(/,/g, '.');
+ s = s.replace(/\[/g, '(').replace(/\]/g, ')');
+ s = s.replace(/\{/g, '(').replace(/\}/g, ')');
+ s = s.replace(/X/g, 'x');
+
+ for(let iter = 0; iter < 4; iter++){
+   s = s.replace(/(\d+(?:\.\d+)?)\s*x/g, '$1*x');
+   s = s.replace(/\)\s*x/g, ')*x');
+   s = s.replace(/x\s*\(/g, 'x*(');
+   s = s.replace(/\)\s*\(/g, ')*(');
+   s = s.replace(/(\d+(?:\.\d+)?)\s*\(/g, '$1*(');
+   s = s.replace(/\)\s*(\d+(?:\.\d+)?)/g, ')*$1');
+   s = s.replace(/x\s*(\d+(?:\.\d+)?)/g, 'x*$1');
+ }
+ return s.replace(/\s+/g, '');
+}
+
+function evaluateMathExpr(exprStr, xVal){
+ const s = exprStr;
+ let pos = 0;
+
+ function peek(){
+  return pos < s.length ? s[pos] : null;
+ }
+
+ function getNumber(){
+  const start = pos;
+  while(pos < s.length && /[0-9.]/.test(s[pos])){
+   pos++;
+  }
+  const sub = s.slice(start, pos);
+  const n = parseFloat(sub);
+  return isNaN(n) ? NaN : n;
+ }
+
+ function parseExpr(){
+  let val = parseTerm();
+  if(isNaN(val)) return NaN;
+  while(pos < s.length){
+   const ch = peek();
+   if(ch === '+'){
+    pos++;
+    const r = parseTerm();
+    if(isNaN(r)) return NaN;
+    val += r;
+   }else if(ch === '-'){
+    pos++;
+    const r = parseTerm();
+    if(isNaN(r)) return NaN;
+    val -= r;
+   }else{
+    break;
+   }
+  }
+  return val;
+ }
+
+ function parseTerm(){
+  let val = parseFactor();
+  if(isNaN(val)) return NaN;
+  while(pos < s.length){
+   const ch = peek();
+   if(ch === '*'){
+    pos++;
+    const r = parseFactor();
+    if(isNaN(r)) return NaN;
+    val *= r;
+   }else if(ch === '/'){
+    pos++;
+    const r = parseFactor();
+    if(isNaN(r) || r === 0) return NaN;
+    val /= r;
+   }else{
+    break;
+   }
+  }
+  return val;
+ }
+
+ function parseFactor(){
+  let sign = 1;
+  while(pos < s.length && (peek() === '+' || peek() === '-')){
+   if(peek() === '-') sign = -sign;
+   pos++;
+  }
+  const val = parsePrimary();
+  return isNaN(val) ? NaN : sign * val;
+ }
+
+ function parsePrimary(){
+  const ch = peek();
+  if(ch === null) return NaN;
+  if(ch === '('){
+   pos++;
+   const val = parseExpr();
+   if(peek() !== ')') return NaN;
+   pos++;
+   return val;
+  }
+  if(ch === 'x'){
+   pos++;
+   return xVal;
+  }
+  if(/[0-9.]/.test(ch)){
+   return getNumber();
+  }
+  return NaN;
+ }
+
+ const result = parseExpr();
+ return (pos === s.length) ? result : NaN;
+}
+
+function checkInverseEquivalence(userInput, a, b){
+ if(!userInput || typeof userInput !== 'string') return false;
+ const clean = sanitizeMathExpr(userInput);
+ if(!clean || !clean.includes('x')) return false;
+ if(!/^[0-9x+\-*/().]+$/.test(clean)) return false;
+
+ const testPoints = [-20, -7, -1, 0, 2, 8, 17, 30];
+ for(let i = 0; i < testPoints.length; i++){
+  const x = testPoints[i];
+  const expected = (x - b) / a;
+  const actual = evaluateMathExpr(clean, x);
+  if(typeof actual !== 'number' || isNaN(actual) || !isFinite(actual)){
+   return false;
+  }
+  if(Math.abs(actual - expected) > 1e-4){
+   return false;
+  }
+ }
+ return true;
+}
+
+let _lastLinearInv = { a: 0, b: 0 };
+
 function genLinearInverseQuestion(fnName='f',lvIdx=0){
- const aPools=[[1,2,3],[2,3,4],[2,3,5]];
- const bPools=[[2,3,4,5,6],[-6,-4,-2,2,4,6],[-10,-6,-4,4,6,10]];
- const aList=aPools[Math.min(lvIdx,2)];
- const bList=bPools[Math.min(lvIdx,2)];
- const a=aList[RI(0,aList.length-1)];
- const b=bList[RI(0,bList.length-1)];
+ const aPools=[[2,3],[2,3,4],[2,3,4,5]];
+ const aList=aPools[Math.min(lvIdx,2)]||[2,3,4,5];
+ 
+ let a, b, attempts=0;
+ do {
+  a = aList[RI(0, aList.length-1)];
+  const kOptions = [-5, -4, -3, -2, -1, 1, 2, 3, 4, 5];
+  const k = kOptions[RI(0, kOptions.length-1)];
+  b = a * k;
+  attempts++;
+ } while(attempts < 10 && (a === _lastLinearInv.a && b === _lastLinearInv.b));
+ _lastLinearInv = { a, b };
 
  const fnTxt=formatLinearFn(fnName,a,b);
  const correctFormula=formatLinearInverse(fnName,a,b);
  const rawRhs=a===1?(b>=0?`x - ${b}`:`x + ${-b}`):(b>=0?`(x - ${b}) / ${a}`:`(x + ${-b}) / ${a}`);
-
- const distractors=new Set();
- const d1=formatLinearInverse(fnName,a,-b);
- if(d1!==correctFormula)distractors.add(d1);
-
- const d2=a===1?`${fnName}⁻¹(x) = 2x ${b>=0?'− '+b:'+ '+(-b)}`:`${fnName}⁻¹(x) = ${a}x ${b>=0?'− '+b:'+ '+(-b)}`;
- if(d2!==correctFormula)distractors.add(d2);
-
- const absB=Math.max(1,Math.abs(b));
- const d3=`${fnName}⁻¹(x) = (x ${b>=0?'−':'+'} ${a}) / ${absB}`;
- if(d3!==correctFormula)distractors.add(d3);
-
- const d4=`${fnName}⁻¹(x) = (x ${b>=0?'+':'−'} ${absB+1}) / ${a}`;
- if(d4!==correctFormula)distractors.add(d4);
-
- const dList=[...distractors].filter(d=>d!==correctFormula).slice(0,3);
- while(dList.length<3){
-  dList.push(`${fnName}⁻¹(x) = (x − ${dList.length+2}) / ${a+1}`);
- }
-
- const choices=[correctFormula,...dList];
- for(let i=choices.length-1;i>0;i--){
-  const j=Math.floor(Math.random()*(i+1));
-  [choices[i],choices[j]]=[choices[j],choices[i]];
- }
- const correctIdx=choices.indexOf(correctFormula);
- const correctLetter=['A','B','C','D'][correctIdx];
 
  const signB=b>=0?`+ ${b}`:`− ${Math.abs(b)}`;
  const oppSignB=b>=0?`− ${b}`:`+ ${Math.abs(b)}`;
@@ -166,13 +288,12 @@ function genLinearInverseQuestion(fnName='f',lvIdx=0){
 
  const hints=[
   `Ganti notasi ${fnName}(x) menjadi y, lalu tukar posisi x dan y: x = ${aPrefix}y ${signB}.`,
-  `Pindahkan konstanta ${b} ke sisi x dengan membalik tandanya: x ${oppSignB} = ${aPrefix}y.`,
+  `Pindahkan konstanta ${b>=0?b:'('+b+')'} ke sisi x dengan membalik tandanya: x ${oppSignB} = ${aPrefix}y.`,
   `Bagi kedua ruas dengan koefisien (${a}) sehingga y berdiri sendiri: ${correctFormula}.`
  ];
 
  return{
   fnName,a,b,fnTxt,correctFormula,rawRhs,
-  choices,correctIdx,correctLetter,
   steps,hints
  };
 }
@@ -188,11 +309,10 @@ function mkGuardianPuz(lvIdx){
  return{
   type:'inverse',kind:'guardian',
   fnName:q.fnName,a:q.a,b:q.b,fnTxt:q.fnTxt,
-  choices:q.choices,correctIdx:q.correctIdx,correctLetter:q.correctLetter,
   correctFormula:q.correctFormula,rawRhs:q.rawRhs,
   steps:q.steps,
-  title:titles[lvIdx],
-  lore:lore[lvIdx],
+  title:titles[lvIdx]||'Guardian — Mathematical Trial',
+  lore:lore[lvIdx]||'',
   fl:`Tentukan invers dari fungsi linear berikut: ${q.fnTxt}`,
   nt:q.fnTxt,
   hs:0,
@@ -202,7 +322,7 @@ function mkGuardianPuz(lvIdx){
 
 function mkInversePuz(lvIdx){
  const fnNames=['f','g','h'];
- const q=genLinearInverseQuestion(fnNames[lvIdx],lvIdx);
+ const q=genLinearInverseQuestion(fnNames[lvIdx]||'f',lvIdx);
  const titles=['Wooden Chest Padlock — Inverse Function','Crystal Chest Padlock — Inverse Function','Vault Chest Padlock — Inverse Function'];
  const fls=[
   `Tentukan rumus fungsi invers ${q.fnName}⁻¹(x) untuk membuka gembok peti kayu.`,
@@ -212,11 +332,10 @@ function mkInversePuz(lvIdx){
  return{
   type:'inverse',kind:'chest',
   fnName:q.fnName,a:q.a,b:q.b,fnTxt:q.fnTxt,
-  choices:q.choices,correctIdx:q.correctIdx,correctLetter:q.correctLetter,
   correctFormula:q.correctFormula,rawRhs:q.rawRhs,
   steps:q.steps,
-  title:titles[lvIdx],
-  fl:fls[lvIdx],
+  title:titles[lvIdx]||'Chest Padlock — Inverse Function',
+  fl:fls[lvIdx]||`Tentukan fungsi invers ${q.fnName}⁻¹(x).`,
   nt:q.fnTxt,
   hs:0,
   hints:()=>q.hints
@@ -524,7 +643,7 @@ function openPuz(kind){
 }
 
 function drawPuz(msg,cls,showExplain=false){
- const pz=G.pz,compCount=pz.fns?pz.fns.length:1;
+ const pz=G.pz;
  let timerHtml='';
  if(pz.kind==='chest'){
   timerHtml=`<div class="pz-chest-timer ${G.chestTimer<30?'urgent':''}" id="pz-timer">⏳ ${formatTime(G.chestTimer)}</div>`;
@@ -533,29 +652,41 @@ function drawPuz(msg,cls,showExplain=false){
  if(pz.kind==='guardian'&&pz.lore){
   guardianHtml=`<div class="pz-guardian-box"><div class="pz-guardian-name">⚔️ ${pz.title}</div><p class="pz-guardian-speech">${pz.lore}</p></div>`;
  }
- let fnsHtml='';
- if(pz.choices){
-  fnsHtml=`<div style="margin:8px 0;text-align:center"><div class="fn" style="font-size:22px;color:#a2ff9b">${pz.fnTxt}</div></div>`;
- }else if(pz.fns){
-  fnsHtml=`<div style="margin:6px 0">${pz.fns.map(f=>`<div class="fn">${f.txt}</div>`).join('')}</div>`;
- }
 
- let optionsHtml='';
- if(pz.choices){
-  optionsHtml=`<div style="margin:10px 0 6px"><b style="color:#ffe494;font-size:13px">Pilih rumus invers yang benar:</b></div>`+
-   `<div class="opt-grid">`+
-   pz.choices.map((ch,idx)=>{
-    const letter=['A','B','C','D'][idx];
-    const isSel=pz.selectedLetter===letter;
-    return`<button class="opt-btn ${isSel?'sel':''}" type="button" data-opt="${letter}">`+
-     `<span class="opt-letter">${letter}</span>`+
-     `<span class="opt-formula">${ch}</span>`+
-     `</button>`;
-   }).join('')+
+ let bodyHtml='';
+ if(pz.type==='inverse'){
+  bodyHtml=
+   `<div class="pz-math-card">`+
+    `<div class="pz-math-intro">Diketahui fungsi:</div>`+
+    `<div class="pz-math-display">${pz.fnTxt}</div>`+
+    `<p class="pz-math-prompt">Tentukan fungsi invers dari ${pz.fnName}(x), yaitu <b>${pz.fnName}⁻¹(x)</b>!</p>`+
+   `</div>`+
+   `<div class="pz-input-row">`+
+    `<span class="pz-input-prefix">${pz.fnName}⁻¹(x) =</span>`+
+    `<input type="text" id="ans" class="pz-input-field" placeholder="contoh: (x - ${Math.abs(pz.b)}) / ${pz.a}" autocomplete="off" spellcheck="false" value="${pz.currentInput||''}">`+
+   `</div>`+
+   `<div style="text-align:center;margin-top:14px">`+
+    `<button id="sb" class="pz-submit-btn">SUBMIT ANSWER</button>`+
+    `<button id="hb" ${pz.hs>=3?'disabled':''}>Hint (${pz.hs}/3)</button>`+
+    `<button id="cb">Close</button>`+
+   `</div>`;
+ }else{
+  let fnsHtml='';
+  if(pz.fns){
+   fnsHtml=`<div style="margin:6px 0">${pz.fns.map(f=>`<div class="fn">${f.txt}</div>`).join('')}</div>`;
+  }
+  bodyHtml=
+   `<p class="hh">${pz.fl}</p>`+
+   fnsHtml+
+   `<div class="pz-input-row">`+
+    `<input type="text" id="ans" class="pz-input-field" placeholder="Jawaban numerik" autocomplete="off" value="${pz.currentInput||''}">`+
+   `</div>`+
+   `<div style="text-align:center;margin-top:14px">`+
+    `<button id="sb" class="pz-submit-btn">SUBMIT ANSWER</button>`+
+    `<button id="hb" ${pz.hs>=3?'disabled':''}>Hint (${pz.hs}/3)</button>`+
+    `<button id="cb">Close</button>`+
    `</div>`;
  }
-
- let inputPrompt=pz.choices?'Pilihan (A / B / C / D)':'Jawaban numerik';
 
  let explainHtml='';
  if(showExplain&&pz.steps){
@@ -564,38 +695,19 @@ function drawPuz(msg,cls,showExplain=false){
    `<ol class="pz-step-list">`+
    pz.steps.slice(0,4).map(s=>`<li><b>${s.title}:</b> <code>${s.math}</code></li>`).join('')+
    `</ol>`+
-   `</div>`;
+  `</div>`;
  }
 
+ const tagLabel=pz.kind==='chest'?'Peti Harta Karun':(pz.kind==='guardian'?'Tantangan Guardian':'Cipher Altar');
+
  $('pz').innerHTML=
-  `<div class="pz-head"><h2>${pz.title}</h2><span class="pz-tag">${pz.choices?'Pilihan Ganda':'Cipher Altar'}</span></div>`+
+  `<div class="pz-head"><h2>${pz.title}</h2><span class="pz-tag">${tagLabel}</span></div>`+
   timerHtml+
   guardianHtml+
-  `<p class="hh">${pz.fl}</p>`+
-  fnsHtml+
-  optionsHtml+
-  `<div style="text-align:center;margin-top:10px"><input type="text" id="ans" placeholder="${inputPrompt}" autocomplete="off" value="${pz.selectedLetter||''}"><br>`+
-  `<button id="sb">Submit</button><button id="hb" ${pz.hs>=3?'disabled':''}>Hint (${pz.hs}/3)</button><button id="cb">Close</button></div>`+
+  bodyHtml+
   `<div id="msg" class="${cls||''}">${msg||''}</div>`+
   explainHtml+
   `${pz.hints().slice(0,pz.hs).map((h,i)=>`<div class="hh">Hint ${i+1}: ${h}</div>`).join('')}`;
-
- if(pz.choices){
-  $('pz').querySelectorAll('.opt-btn').forEach(btn=>{
-   btn.onclick=()=>{
-    const opt=btn.dataset.opt;
-    pz.selectedLetter=opt;
-    $('ans').value=opt;
-    $('pz').querySelectorAll('.opt-btn').forEach(b=>b.classList.toggle('sel',b.dataset.opt===opt));
-   };
-   btn.ondblclick=()=>{
-    const opt=btn.dataset.opt;
-    pz.selectedLetter=opt;
-    $('ans').value=opt;
-    submit();
-   };
-  });
- }
 
  $('sb').onclick=submit;
  $('hb').onclick=()=>{if(pz.hs<3){pz.hs++;SV.run.h++;drawPuz()}};
@@ -603,29 +715,28 @@ function drawPuz(msg,cls,showExplain=false){
   if(pz.kind==='chest'){G.inChestChallenge=false}
   ui(null);try{cv.requestPointerLock()}catch(e){}
  };
- $('ans').onkeydown=e=>{if(e.key==='Enter')submit();if(e.key!=='Escape')e.stopPropagation()};
+ const ansEl=$('ans');
+ if(ansEl){
+  ansEl.oninput=()=>{pz.currentInput=ansEl.value};
+  ansEl.onkeydown=e=>{if(e.key==='Enter')submit();if(e.key!=='Escape')e.stopPropagation()};
+ }
 }
 
 function submit(){
  const pz=G.pz;if(G.busy)return;
- const raw=$('ans').value.trim();
+ const ansEl=$('ans');
+ const raw=ansEl?ansEl.value.trim():'';
  if(!raw){
-  sfx('bad');drawPuz('Pilih opsi A, B, C, D atau ketik jawaban.','no');
+  sfx('bad');drawPuz('Silakan ketik jawaban invers fungsi pada kolom yang tersedia.','no');
   const p=$('pz');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');
   setTimeout(()=>$('ans')&&$('ans').focus(),20);return;
  }
 
  let isCorrect=false;
- if(pz.choices){
-  const userLetter=raw.toUpperCase();
-  const normRaw=raw.replace(/\s+/g,'').toLowerCase();
-  const normCorrectFormula=pz.correctFormula.replace(/\s+/g,'').toLowerCase();
-  const normRhs=(pz.rawRhs||'').replace(/\s+/g,'').toLowerCase();
-  if(userLetter===pz.correctLetter||normRaw===normCorrectFormula||normRaw===normRhs||normRaw===normCorrectFormula.split('=')[1]){
-   isCorrect=true;
-  }
+ if(pz.type==='inverse'){
+  isCorrect=checkInverseEquivalence(raw, pz.a, pz.b);
  }else{
-  const s=raw.replace('−','-');
+  const s=raw.replace(/[−–]/g,'-');
   if(!/^-?\d+$/.test(s)){
    sfx('bad');drawPuz('Harap masukkan angka bulat.','no');
    const p=$('pz');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');
@@ -835,7 +946,7 @@ function renderSolutionWalkthrough(pz){
   }
  }
 
- const fnsGrid=pz.choices
+ const fnsGrid=pz.correctFormula
   ? `<span class="sol-fn-badge">${pz.fnTxt} &nbsp;➜&nbsp; <b style="color:#a2ff9b">${pz.correctFormula}</b></span>`
   : (pz.fns?pz.fns.map(f=>`<span class="sol-fn-badge">${f.txt}</span>`).join(''):'');
 
@@ -847,7 +958,7 @@ function renderSolutionWalkthrough(pz){
   `</div>`+
   `<div class="sol-card">`+
    `<div class="sol-card-title"><span>📐</span> SOAL & RUMUS MATEMATIKA</div>`+
-   `<div class="sol-card-text">Soal: <b style="color:#ffe9a8">${pz.nt}</b>${pz.choices?'':` &nbsp;|&nbsp; Input: <b>${pz.type==='inverse'?'y':'x'} = ${pz.x}</b>`}</div>`+
+   `<div class="sol-card-text">Soal: <b style="color:#ffe9a8">${pz.nt}</b>${pz.correctFormula?'':` &nbsp;|&nbsp; Input: <b>${pz.type==='inverse'?'y':'x'} = ${pz.x}</b>`}</div>`+
    `<div class="sol-fns-grid">${fnsGrid}</div>`+
   `</div>`+
   `<div class="sol-card">`+

@@ -116,17 +116,17 @@ input[type=text]:focus{outline:none;box-shadow:0 0 12px #c9a24b88}
 #hud-hp-fill.low{background:linear-gradient(90deg,#b71c1c,#ff3838);animation:blinkHp .8s infinite alternate}
 @keyframes blinkHp{from{opacity:1}to{opacity:.4}}
 
-/* ===== Math Formula Option Grid (A, B, C, D) ===== */
-.opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 10px}
-@media (max-width:540px){.opt-grid{grid-template-columns:1fr}}
-.opt-btn{background:linear-gradient(135deg,rgba(36,54,42,.85),rgba(20,32,24,.9));border:1px solid #c9a24b88;border-radius:8px;padding:10px 12px;color:#ffe9a8;font-family:'Courier New',monospace;font-size:15px;font-weight:bold;cursor:pointer;transition:.2s;text-align:left;display:flex;align-items:center;gap:10px;margin:0}
-.opt-btn:hover:not(:disabled){background:linear-gradient(135deg,#3a6149,#264633);border-color:#ffd24c;box-shadow:0 0 14px #ffd24c66;transform:translateY(-1px)}
-.opt-btn.sel{background:linear-gradient(135deg,#c9a24b,#8e681c);color:#160e04;border-color:#ffe694;box-shadow:0 0 18px #ffd24c88}
-.opt-btn.wrong{background:linear-gradient(135deg,#6b2020,#381010);border-color:#ff5252;color:#ffb3b3}
-.opt-btn.correct{background:linear-gradient(135deg,#24542d,#122f18);border-color:#8fe388;color:#d6ffd2}
-.opt-letter{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.5);border:1px solid #c9a24b88;font-size:12px;color:#ffe494;flex-shrink:0}
-.opt-btn.sel .opt-letter{background:#160e04;color:#ffe694;border-color:#ffe694}
-.opt-formula{font-size:14px;flex:1}
+/* ===== Math Problem Card & Answer Input Row ===== */
+.pz-math-card{background:rgba(0,0,0,.5);border:1px solid rgba(201,162,75,.35);border-radius:12px;padding:14px 18px;margin:12px 0;text-align:center;box-shadow:inset 0 0 24px rgba(0,0,0,.4)}
+.pz-math-intro{font-size:13.5px;color:#d8cfb4;margin:0 0 4px;letter-spacing:.02em}
+.pz-math-display{font-size:26px;color:#a2ff9b;margin:6px 0 8px;letter-spacing:.05em;font-weight:bold;font-family:'Courier New',monospace;text-shadow:0 0 14px rgba(162,255,155,.35)}
+.pz-math-prompt{font-size:14px;color:#ffe694;margin:0;line-height:1.45}
+
+.pz-input-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:18px 0 14px;flex-wrap:wrap}
+.pz-input-prefix{font-family:'Courier New',monospace;font-size:21px;font-weight:bold;color:#ffe494;letter-spacing:.04em}
+.pz-input-field{font:inherit;font-size:18px !important;width:270px !important;max-width:85vw;padding:9px 14px !important;background:rgba(0,0,0,.75) !important;color:#fff2c2 !important;border:1px solid #c9a24b !important;border-radius:8px;text-align:left !important;font-family:'Courier New',monospace;transition:border-color .2s, box-shadow .2s}
+.pz-input-field:focus{outline:none;border-color:#ffe494 !important;box-shadow:0 0 16px rgba(255,210,76,.5) !important}
+.pz-submit-btn{padding:10px 28px !important;font-weight:bold !important;font-size:15px !important;letter-spacing:.06em !important;text-transform:uppercase}
 
 /* ===== Concept Guidance Card for Wrong Answers ===== */
 .pz-explain-card{background:rgba(0,0,0,.55);border:1px solid #ff9d8277;border-left:4px solid #ff7043;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:13px;line-height:1.5;color:#e8ded1;text-align:left}
