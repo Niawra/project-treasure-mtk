@@ -100,80 +100,126 @@ function mkCompPuz(lvIdx){
  };
 }
 
+function formatLinearFn(n,a,b){
+ const sign=b>=0?'+':'−',absB=Math.abs(b),aStr=a===1?'':(a===-1?'−':a);
+ const rhs=b===0?`${aStr}x`:`${aStr}x ${sign} ${absB}`;
+ return `${n}(x) = ${rhs}`;
+}
+
+function formatLinearInverse(n,a,b){
+ const sign=b>=0?'−':'+',absB=Math.abs(b);
+ if(a===1)return b===0?`${n}⁻¹(x) = x`:`${n}⁻¹(x) = x ${sign} ${absB}`;
+ const num=b===0?'x':`(x ${sign} ${absB})`;
+ return `${n}⁻¹(x) = ${num} / ${a}`;
+}
+
+function genLinearInverseQuestion(fnName='f',lvIdx=0){
+ const aPools=[[1,2,3],[2,3,4],[2,3,5]];
+ const bPools=[[2,3,4,5,6],[-6,-4,-2,2,4,6],[-10,-6,-4,4,6,10]];
+ const aList=aPools[Math.min(lvIdx,2)];
+ const bList=bPools[Math.min(lvIdx,2)];
+ const a=aList[RI(0,aList.length-1)];
+ const b=bList[RI(0,bList.length-1)];
+
+ const fnTxt=formatLinearFn(fnName,a,b);
+ const correctFormula=formatLinearInverse(fnName,a,b);
+ const rawRhs=a===1?(b>=0?`x - ${b}`:`x + ${-b}`):(b>=0?`(x - ${b}) / ${a}`:`(x + ${-b}) / ${a}`);
+
+ const distractors=new Set();
+ const d1=formatLinearInverse(fnName,a,-b);
+ if(d1!==correctFormula)distractors.add(d1);
+
+ const d2=a===1?`${fnName}⁻¹(x) = 2x ${b>=0?'− '+b:'+ '+(-b)}`:`${fnName}⁻¹(x) = ${a}x ${b>=0?'− '+b:'+ '+(-b)}`;
+ if(d2!==correctFormula)distractors.add(d2);
+
+ const absB=Math.max(1,Math.abs(b));
+ const d3=`${fnName}⁻¹(x) = (x ${b>=0?'−':'+'} ${a}) / ${absB}`;
+ if(d3!==correctFormula)distractors.add(d3);
+
+ const d4=`${fnName}⁻¹(x) = (x ${b>=0?'+':'−'} ${absB+1}) / ${a}`;
+ if(d4!==correctFormula)distractors.add(d4);
+
+ const dList=[...distractors].filter(d=>d!==correctFormula).slice(0,3);
+ while(dList.length<3){
+  dList.push(`${fnName}⁻¹(x) = (x − ${dList.length+2}) / ${a+1}`);
+ }
+
+ const choices=[correctFormula,...dList];
+ for(let i=choices.length-1;i>0;i--){
+  const j=Math.floor(Math.random()*(i+1));
+  [choices[i],choices[j]]=[choices[j],choices[i]];
+ }
+ const correctIdx=choices.indexOf(correctFormula);
+ const correctLetter=['A','B','C','D'][correctIdx];
+
+ const signB=b>=0?`+ ${b}`:`− ${Math.abs(b)}`;
+ const oppSignB=b>=0?`− ${b}`:`+ ${Math.abs(b)}`;
+ const aPrefix=a===1?'':`${a}`;
+
+ const steps=[
+  {num:1,title:`Ganti ${fnName}(x) dengan y`,math:`y = ${aPrefix}x ${signB}`,desc:`Tuliskan persamaan fungsi dengan variabel output y.`},
+  {num:2,title:`Tukar posisi variabel x dan y`,math:`x = ${aPrefix}y ${signB}`,desc:`Untuk mencari fungsi invers, tukar peranan variabel input dan output.`},
+  {num:3,title:`Pindahkan konstanta ke ruas x`,math:`x ${oppSignB} = ${aPrefix}y`,desc:`Pindahkan konstanta agar ruas y hanya memiliki suku koefisien.`},
+  {num:4,title:`Bagi kedua ruas dengan koefisien y`,math:a===1?`y = x ${oppSignB}`:`y = (x ${oppSignB}) / ${a}`,desc:`Bagi kedua sisi persamaan dengan ${a} agar y berdiri sendiri.`},
+  {num:5,title:`Hasil akhir fungsi invers ${fnName}⁻¹(x)`,math:correctFormula,desc:`Substitusikan kembali y menjadi notasi fungsi invers ${fnName}⁻¹(x).`}
+ ];
+
+ const hints=[
+  `Ganti notasi ${fnName}(x) menjadi y, lalu tukar posisi x dan y: x = ${aPrefix}y ${signB}.`,
+  `Pindahkan konstanta ${b} ke sisi x dengan membalik tandanya: x ${oppSignB} = ${aPrefix}y.`,
+  `Bagi kedua ruas dengan koefisien (${a}) sehingga y berdiri sendiri: ${correctFormula}.`
+ ];
+
+ return{
+  fnName,a,b,fnTxt,correctFormula,rawRhs,
+  choices,correctIdx,correctLetter,
+  steps,hints
+ };
+}
+
 function mkGuardianPuz(lvIdx){
- const L=LV[lvIdx],fns=L.fs,x=L.guardX;
- let v=x;for(let i=fns.length-1;i>=0;i--)v=fns[i].ap(v);
- const nm=fns.map(f=>f.n),nest=nm.reduceRight((a,n)=>n+'('+a+')',x);
- const titles=['Forest Stone Guardian — Trial','Crystal Sentinel — Trial','Temple Titan Guardian — Trial'];
+ const q=genLinearInverseQuestion('f',lvIdx);
+ const titles=['Forest Stone Guardian — Mathematical Trial','Crystal Sentinel — Mathematical Trial','Imperial Titan Guardian — Mathematical Trial'];
  const lore=[
-  '“Halt, mortal! The sacred glade is barred to those blind to mathematics. Prove your worth: evaluate the primal function or face expulsion!”',
-  '“The crystal harmonics reject the unworthy! Harmonize with the dual-function composition from inside out, or be cast back!”',
-  '“By order of the Ancient Architects, none shall approach the Royal Chest without mastering the tri-cipher! Solve or fall!”'
+  '“Halt, mortal! The sacred glade is barred to those blind to mathematics. Prove your worth: find the inverse function or face expulsion!”',
+  '“The crystal harmonics reject the unworthy! Decipher the inverse function of our crystal frequency, or be cast back!”',
+  '“By order of the Ancient Architects, none shall approach the Royal Chest without mastering the inverse cipher! Solve or fall!”'
  ];
  return{
-  type:'guardian',kind:'guardian',fns,x,ans:v,nest,
+  type:'inverse',kind:'guardian',
+  fnName:q.fnName,a:q.a,b:q.b,fnTxt:q.fnTxt,
+  choices:q.choices,correctIdx:q.correctIdx,correctLetter:q.correctLetter,
+  correctFormula:q.correctFormula,rawRhs:q.rawRhs,
+  steps:q.steps,
   title:titles[lvIdx],
   lore:lore[lvIdx],
-  fl:'Answer the Guardian’s mathematical inquiry correctly to deactivate its protective ward.',
-  nt:fns.length==1?`f(${x})`:`(${nm.join(' ∘ ')})(${x}) = ${nest}`,
+  fl:`Tentukan invers dari fungsi linear berikut: ${q.fnTxt}`,
+  nt:q.fnTxt,
   hs:0,
-  hints:()=>{
-   const i=fns[fns.length-1];
-   return[
-    `Evaluate ${i.n}(${x}) first.`,
-    `Substitute ${x} into ${i.txt}: ${i.sub(x)}.`,
-    `Continue to the outer function with your calculated intermediate value.`
-   ];
-  }
+  hints:()=>q.hints
  };
 }
 
 function mkInversePuz(lvIdx){
- const L=LV[lvIdx],fns=L.fs,y=L.chestY;
- let ans;
- if(lvIdx===0){
-  ans=fns[0].inv(y);
- }else if(lvIdx===1){
-  ans=fns[1].inv(fns[0].inv(y));
- }else{
-  ans=fns[2].inv(fns[1].inv(fns[0].inv(y)));
- }
- const nm=fns.map(f=>f.n);
- const revNm=[...nm].reverse();
- const titles=['Wooden Chest Lock — Inverse Function','Crystal Chest Lock — Inverse Composition','Vault Chest Lock — Triple Inverse Composition'];
+ const fnNames=['f','g','h'];
+ const q=genLinearInverseQuestion(fnNames[lvIdx],lvIdx);
+ const titles=['Wooden Chest Padlock — Inverse Function','Crystal Chest Padlock — Inverse Function','Vault Chest Padlock — Inverse Function'];
  const fls=[
-  'Calculate the inverse function f⁻¹(x) to decrypt the padlock. Reverse operations: subtract 3, then divide by 2.',
-  'Calculate the inverse of the composite function: (f ∘ g)⁻¹ = g⁻¹ ∘ f⁻¹. Remember: composition order is reversed!',
-  'Calculate the inverse of the 3-function composition: (f ∘ g ∘ h)⁻¹ = h⁻¹ ∘ g⁻¹ ∘ f⁻¹. Work from f⁻¹ through g⁻¹ to h⁻¹!'
+  `Tentukan rumus fungsi invers ${q.fnName}⁻¹(x) untuk membuka gembok peti kayu.`,
+  `Tentukan rumus fungsi invers ${q.fnName}⁻¹(x) untuk mengurai kristal pengunci peti.`,
+  `Tentukan rumus fungsi invers ${q.fnName}⁻¹(x) untuk membuka kunci brankas kuno.`
  ];
- const nt=fns.length===1?`f⁻¹(${y})`:`(${nm.join(' ∘ ')})⁻¹(${y}) = (${revNm.map(n=>n+'⁻¹').join(' ∘ ')})(${y})`;
  return{
-  type:'inverse',kind:'chest',fns,x:y,ans,
+  type:'inverse',kind:'chest',
+  fnName:q.fnName,a:q.a,b:q.b,fnTxt:q.fnTxt,
+  choices:q.choices,correctIdx:q.correctIdx,correctLetter:q.correctLetter,
+  correctFormula:q.correctFormula,rawRhs:q.rawRhs,
+  steps:q.steps,
   title:titles[lvIdx],
   fl:fls[lvIdx],
-  nt,
+  nt:q.fnTxt,
   hs:0,
-  hints:()=>{
-   if(lvIdx===0){
-    return[
-     `To find f⁻¹(y), solve y = 2x + 3 for x: 2x = y − 3, so x = (y − 3)/2.`,
-     `Substitute y = ${y}: f⁻¹(${y}) = (${y} − 3) / 2.`,
-     `Compute ${y} − 3 first (${y-3}), then divide by 2.`
-    ];
-   }else if(lvIdx===1){
-    return[
-     `Use the inverse composition theorem: (f ∘ g)⁻¹ = g⁻¹ ∘ f⁻¹. The outside function inverse is applied FIRST.`,
-     `First evaluate f⁻¹(${y}) = (${y} − 3)/2 = ${fns[0].inv(y)}.`,
-     `Then substitute that result into g⁻¹: g⁻¹(${fns[0].inv(y)}) = ${fns[0].inv(y)} + 1.`
-    ];
-   }else{
-    return[
-     `Use the chained inverse theorem: (f ∘ g ∘ h)⁻¹ = h⁻¹ ∘ g⁻¹ ∘ f⁻¹. The order is completely reversed!`,
-     `First calculate f⁻¹(${y}) = (${y} − 1)/2 = 7. Then evaluate g⁻¹(7) = 7 − 3 = 4.`,
-     `Finally substitute 4 into h⁻¹(4) = (4 + 2)/3.`
-    ];
-   }
-  }
+  hints:()=>q.hints
  };
 }
 
@@ -209,9 +255,10 @@ setInterval(()=>{if(!AC||mute)return;const l=G.on?G.lv:0,sc=[[220,247,277,330,37
  if(G.on&&Math.random()<.3){if(l==0)tone(RI(2000,3000),.12,'sine',.03,0,RI(1500,2400));else if(l==1)tone(1200,.15,'sine',.05,0,600);else nz(2,.05,200)}},900);
 
 /* ===== state / ui ===== */
-let G={on:false,lv:0,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,cine:0,ct:0,keyGranted:false,advancing:false,lives:3,levelTimer:600,levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}};
+let G={on:false,lv:0,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,cine:0,ct:0,keyGranted:false,advancing:false,lives:3,hp:100,maxHp:100,invulnTimer:0,levelTimer:600,levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}};
 let ST='menu',SB='menu',K={},W=null,COL=[],IT=[],ANI=[],yaw=0,pitch=.35,drag=false,lockT=0;
 let DOOR=null,GC=null,CHEST=null,PG=null,ORB=null,RELIC=null,GATE_T=0;
+let mouseSens=0.0022,camDist=4.0;
 const P={x:0,y:0,z:24,vx:0,vz:0,vy:0,g:true,face:Math.PI,sp:0,st:0,act:0};
 
 function updateHeartsHUD(){
@@ -222,6 +269,16 @@ function updateHeartsHUD(){
   h.push(`<span class="heart-icon ${active?'':'lost'}">${active?'❤️':'🖤'}</span>`);
  }
  e.innerHTML=h.join('');
+}
+
+function updateHealthHUD(){
+ const e=$('hp-val'),f=$('hud-hp-fill');
+ if(e)e.textContent=Math.round(G.hp||0);
+ if(f){
+  const pct=Math.max(0,Math.min(100,((G.hp||0)/(G.maxHp||100))*100));
+  f.style.width=pct+'%';
+  f.classList.toggle('low',pct<=30);
+ }
 }
 
 function flashRed(){
@@ -236,10 +293,25 @@ function flashRed(){
  });
 }
 
+function damagePlayer(amount,reason='Guardian attack'){
+ if(G.invulnTimer>0||!G.on||G.hp<=0)return;
+ G.hp=Math.max(0,G.hp-amount);
+ G.invulnTimer=1.2;
+ updateHealthHUD();
+ sfx('damage');
+ flashRed();
+ if(G.hp<=0){
+  gameOver(reason||'Your vitality was depleted from ancient cipher hazards.');
+ }else{
+  toast(`Took ${amount} damage! HP: ${G.hp}/100`,'warn');
+ }
+}
+
 function deductLife(reason='Incorrect calculation'){
  if(G.lives<=0)return;
  G.lives--;
  updateHeartsHUD();
+ updateHealthHUD();
  sfx('damage');
  flashRed();
  if(G.lives<=0){
@@ -266,7 +338,12 @@ function gameOver(reason){
 
 function retryCheckpoint(){
  G.lives=3;
+ G.hp=100;
+ G.maxHp=100;
+ G.invulnTimer=0;
  updateHeartsHUD();
+ updateHealthHUD();
+ updateHealthHUD();
  G.levelTimer=LV_TIMES[G.lv];
  G.chestTimer=180;
  G.inChestChallenge=false;
@@ -274,9 +351,17 @@ function retryCheckpoint(){
  G.on=true;
  P.x=G.cp.x;P.z=G.cp.z;P.y=0;P.vx=P.vz=P.vy=0;
  yaw=G.cp.yaw;
+ if(G.guardian&&!G.guardianDefeated){
+  G.guardian.group.position.set(G.guardian.homeX,0,G.guardian.homeZ);
+  G.guardian.x=G.guardian.homeX;
+  G.guardian.z=G.guardian.homeZ;
+  G.guardian.state='idle';
+  G.guardian.attackCooldown=0;
+  G.guardianAlerted=false;
+ }
  ui(null);
  try{cv.requestPointerLock()}catch(e){}
- toast('Respawned at checkpoint with 3 lives. Continue your quest!','ok');
+ toast('Respawned at checkpoint with 100 HP. Continue your quest!','ok');
 }
 
 function updateCheckpoint(x,z,y=0){
@@ -355,6 +440,7 @@ function hudUpd(){
  const L=LV[G.lv],o=QD[G.lv].find(([k])=>!G.q[k]);
  const chOk=G.chestState==='opened',kyOk=!!(G.hasKey&&G.keys[G.lv]),drOk=G.doorState==='unlocked';
  updateHeartsHUD();
+ updateHealthHUD();
  const ht=$('hud-timer');
  if(ht){
   ht.textContent='⏱️ '+formatTime(G.levelTimer);
@@ -419,6 +505,7 @@ function resume(){if(!G.on)return ui('menu');ui(null);try{cv.requestPointerLock(
 $('vm').oninput=e=>{vm=+e.target.value;vol()};
 $('vu').oninput=e=>{vu=+e.target.value;vol()};
 $('mu').onchange=e=>{mute=e.target.checked;vol()};
+const sensIn=$('sens');if(sensIn)sensIn.oninput=e=>{mouseSens=+e.target.value};
 
 /* ===== puzzle ui ===== */
 function openPuz(kind){
@@ -436,8 +523,8 @@ function openPuz(kind){
  G.pz=pz;G.busy=false;ui('puz');drawPuz();setTimeout(()=>$('ans')&&$('ans').focus(),50);
 }
 
-function drawPuz(msg,cls){
- const pz=G.pz,compCount=pz.fns.length;
+function drawPuz(msg,cls,showExplain=false){
+ const pz=G.pz,compCount=pz.fns?pz.fns.length:1;
  let timerHtml='';
  if(pz.kind==='chest'){
   timerHtml=`<div class="pz-chest-timer ${G.chestTimer<30?'urgent':''}" id="pz-timer">⏳ ${formatTime(G.chestTimer)}</div>`;
@@ -447,23 +534,69 @@ function drawPuz(msg,cls){
   guardianHtml=`<div class="pz-guardian-box"><div class="pz-guardian-name">⚔️ ${pz.title}</div><p class="pz-guardian-speech">${pz.lore}</p></div>`;
  }
  let fnsHtml='';
- if(pz.type==='inverse'){
-  fnsHtml=`<div style="margin:6px 0">${pz.fns.map(f=>`<div class="fn">${f.txt} &nbsp;➜&nbsp; <b style="color:#a2ff9b">${f.invTxt}</b></div>`).join('')}</div>`;
- }else{
+ if(pz.choices){
+  fnsHtml=`<div style="margin:8px 0;text-align:center"><div class="fn" style="font-size:22px;color:#a2ff9b">${pz.fnTxt}</div></div>`;
+ }else if(pz.fns){
   fnsHtml=`<div style="margin:6px 0">${pz.fns.map(f=>`<div class="fn">${f.txt}</div>`).join('')}</div>`;
  }
+
+ let optionsHtml='';
+ if(pz.choices){
+  optionsHtml=`<div style="margin:10px 0 6px"><b style="color:#ffe494;font-size:13px">Pilih rumus invers yang benar:</b></div>`+
+   `<div class="opt-grid">`+
+   pz.choices.map((ch,idx)=>{
+    const letter=['A','B','C','D'][idx];
+    const isSel=pz.selectedLetter===letter;
+    return`<button class="opt-btn ${isSel?'sel':''}" type="button" data-opt="${letter}">`+
+     `<span class="opt-letter">${letter}</span>`+
+     `<span class="opt-formula">${ch}</span>`+
+     `</button>`;
+   }).join('')+
+   `</div>`;
+ }
+
+ let inputPrompt=pz.choices?'Pilihan (A / B / C / D)':'Jawaban numerik';
+
+ let explainHtml='';
+ if(showExplain&&pz.steps){
+  explainHtml=`<div class="pz-explain-card">`+
+   `<div class="pz-explain-title">💡 Panduan Langkah Konsep Invers:</div>`+
+   `<ol class="pz-step-list">`+
+   pz.steps.slice(0,4).map(s=>`<li><b>${s.title}:</b> <code>${s.math}</code></li>`).join('')+
+   `</ol>`+
+   `</div>`;
+ }
+
  $('pz').innerHTML=
-  `<div class="pz-head"><h2>${pz.title}</h2><span class="pz-tag">${compCount} Function${compCount>1?'s':''}</span></div>`+
+  `<div class="pz-head"><h2>${pz.title}</h2><span class="pz-tag">${pz.choices?'Pilihan Ganda':'Cipher Altar'}</span></div>`+
   timerHtml+
   guardianHtml+
   `<p class="hh">${pz.fl}</p>`+
   fnsHtml+
-  `<p>Given input: <b>${pz.type==='inverse'?'y':'x'} = ${pz.x}</b></p>`+
-  `<div class="nt">${pz.nt}</div>`+
-  `<div style="text-align:center"><input type="text" id="ans" inputmode="numeric" placeholder="answer" autocomplete="off"><br>`+
+  optionsHtml+
+  `<div style="text-align:center;margin-top:10px"><input type="text" id="ans" placeholder="${inputPrompt}" autocomplete="off" value="${pz.selectedLetter||''}"><br>`+
   `<button id="sb">Submit</button><button id="hb" ${pz.hs>=3?'disabled':''}>Hint (${pz.hs}/3)</button><button id="cb">Close</button></div>`+
   `<div id="msg" class="${cls||''}">${msg||''}</div>`+
+  explainHtml+
   `${pz.hints().slice(0,pz.hs).map((h,i)=>`<div class="hh">Hint ${i+1}: ${h}</div>`).join('')}`;
+
+ if(pz.choices){
+  $('pz').querySelectorAll('.opt-btn').forEach(btn=>{
+   btn.onclick=()=>{
+    const opt=btn.dataset.opt;
+    pz.selectedLetter=opt;
+    $('ans').value=opt;
+    $('pz').querySelectorAll('.opt-btn').forEach(b=>b.classList.toggle('sel',b.dataset.opt===opt));
+   };
+   btn.ondblclick=()=>{
+    const opt=btn.dataset.opt;
+    pz.selectedLetter=opt;
+    $('ans').value=opt;
+    submit();
+   };
+  });
+ }
+
  $('sb').onclick=submit;
  $('hb').onclick=()=>{if(pz.hs<3){pz.hs++;SV.run.h++;drawPuz()}};
  $('cb').onclick=()=>{
@@ -475,19 +608,42 @@ function drawPuz(msg,cls){
 
 function submit(){
  const pz=G.pz;if(G.busy)return;
- const s=$('ans').value.trim().replace('−','-');
- if(!/^-?\d+$/.test(s)){
-  sfx('bad');drawPuz('Please enter a whole number.','no');
+ const raw=$('ans').value.trim();
+ if(!raw){
+  sfx('bad');drawPuz('Pilih opsi A, B, C, D atau ketik jawaban.','no');
   const p=$('pz');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');
   setTimeout(()=>$('ans')&&$('ans').focus(),20);return;
  }
- if(+s!==pz.ans){
-  deductLife(pz.kind==='chest'?'Incorrect inverse chest key calculation':(pz.kind==='guardian'?'Guardian struck with warding burst':'Incorrect cipher attempt at Altar'));
-  if(G.lives<=0)return;
-  drawPuz('Incorrect answer! Check your calculations and try again. (-1 Life)','no');
+
+ let isCorrect=false;
+ if(pz.choices){
+  const userLetter=raw.toUpperCase();
+  const normRaw=raw.replace(/\s+/g,'').toLowerCase();
+  const normCorrectFormula=pz.correctFormula.replace(/\s+/g,'').toLowerCase();
+  const normRhs=(pz.rawRhs||'').replace(/\s+/g,'').toLowerCase();
+  if(userLetter===pz.correctLetter||normRaw===normCorrectFormula||normRaw===normRhs||normRaw===normCorrectFormula.split('=')[1]){
+   isCorrect=true;
+  }
+ }else{
+  const s=raw.replace('−','-');
+  if(!/^-?\d+$/.test(s)){
+   sfx('bad');drawPuz('Harap masukkan angka bulat.','no');
+   const p=$('pz');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');
+   setTimeout(()=>$('ans')&&$('ans').focus(),20);return;
+  }
+  if(+s===pz.ans){
+   isCorrect=true;
+  }
+ }
+
+ if(!isCorrect){
+  damagePlayer(25,pz.kind==='chest'?'Ancient chest defense trap':(pz.kind==='guardian'?'Guardian struck with warding burst':'Incorrect cipher attempt at Altar'));
+  if(G.hp<=0)return;
+  drawPuz('Jawaban belum tepat! Cek konsep langkah penyelesaian di bawah (-25 HP).','no',true);
   const p=$('pz');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');
   setTimeout(()=>$('ans')&&$('ans').focus(),20);return;
  }
+
  G.busy=true;sfx('ok');flash();
  if(pz.kind==='altar'){
   G.altarSolved=true;
@@ -501,7 +657,14 @@ function submit(){
   },600);
  }else if(pz.kind==='guardian'){
   G.guardianDefeated=true;
+  if(G.guardian){
+   G.guardian.state='defeated';
+   G.guardian.defeated=true;
+   if(G.guardian.col)G.guardian.col.off=true;
+  }
+  if(G.guardianIt)G.guardianIt.on=false;
   q('guardian');
+  q('inverse');
   $('msg').className='ok';$('msg').textContent='Correct! Guardian Deactivated. Path Opened…';
   setTimeout(()=>{
    ui('sol');
@@ -543,6 +706,7 @@ function claimGuardian(){
  if(G.guardian){
   if(G.guardian.col)G.guardian.col.off=true;
   G.guardian.defeated=true;
+  G.guardian.state='defeated';
  }
  if(G.guardianIt)G.guardianIt.on=false;
  toast('Guardian Deactivated! The Wooden Treasure Chest is accessible.','ok');
@@ -551,16 +715,27 @@ function claimGuardian(){
 }
 
 function renderSolutionWalkthrough(pz){
- const lvIdx=G.lv,L=LV[lvIdx],count=pz.fns.length;
+ const lvIdx=G.lv,L=LV[lvIdx],count=pz.fns?pz.fns.length:1;
  let subtitle='',conceptTitle='',conceptDesc='',actionLabel='',actionAttr='';
  const steps=[];
 
  if(pz.type==='inverse'){
   subtitle=`SOLUTION WALKTHROUGH · INVERSE FUNCTION CIPHER · LEVEL ${lvIdx+1} (${L.n})`;
-  actionLabel='CLAIM YOUR TREASURE';
-  actionAttr='claim';
+  actionLabel=pz.kind==='chest'?'CLAIM YOUR TREASURE':'APPROACH TREASURE CHEST';
+  actionAttr=pz.kind==='chest'?'claim':'claimGuardian';
 
-  if(count===1){
+  if(pz.steps){
+   conceptTitle=`Konsep: Invers Fungsi Linear ${pz.fnName}⁻¹(x)`;
+   conceptDesc=`Fungsi invers ${pz.fnName}⁻¹(x) membalikkan pemetaan fungsi ${pz.fnName}(x). Untuk fungsi linear ${pz.fnTxt}, proses mencari invers dilakukan dengan aljabar sistematis: 1) Ganti fungsi dengan y, 2) Tukar posisi variabel x dan y, 3) Pindahkan konstanta, 4) Bagi dengan koefisien untuk memperoleh bentuk invers akhir.`;
+   pz.steps.forEach(s=>{
+    steps.push({
+     num:s.num,
+     label:`Langkah ${s.num}: ${s.title}`,
+     desc:s.desc,
+     math:s.math
+    });
+   });
+  }else if(count===1){
    conceptTitle='Konsep: Fungsi Invers Tunggal f⁻¹(x)';
    conceptDesc='Fungsi invers f⁻¹(x) membalikkan pemetaan fungsi f(x). Jika fungsi f mengalikan x dengan 2 lalu menambahkan 3, maka rumus invers membalik operasi tersebut: kurangi dengan 3 terlebih dahulu, kemudian bagi hasilnya dengan 2. f⁻¹(x) = (x − 3) / 2.';
    const fn=pz.fns[0];
@@ -660,9 +835,9 @@ function renderSolutionWalkthrough(pz){
   }
  }
 
- const fnsGrid=pz.type==='inverse'
-  ? pz.fns.map(f=>`<span class="sol-fn-badge">${f.txt} &nbsp;➜&nbsp; <b style="color:#a2ff9b">${f.invTxt}</b></span>`).join('')
-  : pz.fns.map(f=>`<span class="sol-fn-badge">${f.txt}</span>`).join('');
+ const fnsGrid=pz.choices
+  ? `<span class="sol-fn-badge">${pz.fnTxt} &nbsp;➜&nbsp; <b style="color:#a2ff9b">${pz.correctFormula}</b></span>`
+  : (pz.fns?pz.fns.map(f=>`<span class="sol-fn-badge">${f.txt}</span>`).join(''):'');
 
  $('sol-box').innerHTML=
   `<div class="sol-header">`+
@@ -672,7 +847,7 @@ function renderSolutionWalkthrough(pz){
   `</div>`+
   `<div class="sol-card">`+
    `<div class="sol-card-title"><span>📐</span> SOAL & RUMUS MATEMATIKA</div>`+
-   `<div class="sol-card-text">Soal: <b style="color:#ffe9a8">${pz.nt}</b> &nbsp;|&nbsp; Input: <b>${pz.type==='inverse'?'y':'x'} = ${pz.x}</b></div>`+
+   `<div class="sol-card-text">Soal: <b style="color:#ffe9a8">${pz.nt}</b>${pz.choices?'':` &nbsp;|&nbsp; Input: <b>${pz.type==='inverse'?'y':'x'} = ${pz.x}</b>`}</div>`+
    `<div class="sol-fns-grid">${fnsGrid}</div>`+
   `</div>`+
   `<div class="sol-card">`+
@@ -691,7 +866,7 @@ function renderSolutionWalkthrough(pz){
   `</div>`+
   `<div class="sol-result">`+
    `<div class="sol-res-label">Hasil Akhir Perhitungan</div>`+
-   `<div class="sol-res-val">${pz.nt.split('=')[0].trim()} = ${pz.ans}</div>`+
+   `<div class="sol-res-val">${pz.correctFormula?pz.correctFormula:(pz.nt.split('=')[0].trim()+' = '+pz.ans)}</div>`+
   `</div>`+
   `<div class="sol-actions">`+
    `<button class="btn-claim" id="btn-claim" data-a="${actionAttr}">`+
@@ -1033,6 +1208,7 @@ function buildGuardian(levelIdx){
 
  const animParts=[];
  let col,coreLight;
+ let armL,armR,halberd,torso,head,body,crown,shards;
 
  if(levelIdx===0){
   // LEVEL 1: Ancient Forest Stone Guardian
@@ -1052,7 +1228,7 @@ function buildGuardian(levelIdx){
   mk(new THREE.CylinderGeometry(1.3,1.6,.4,8),darkRockMat,0,.2,0);
 
   // Guardian Torso (Massive boulder structure)
-  const torso=new THREE.Group();torso.position.set(0,1.8,0);g.add(torso);
+  torso=new THREE.Group();torso.position.set(0,1.8,0);g.add(torso);
   mk(new THREE.DodecahedronGeometry(.95,0),rockMat,0,0,0,.3,.2,0,torso);
   mk(new THREE.BoxGeometry(1.6,.45,.7),darkRockMat,0,.55,0,0,0,0,torso);
 
@@ -1060,14 +1236,14 @@ function buildGuardian(levelIdx){
   mk(new THREE.OctahedronGeometry(.28,0),runeMat,0,0,.65,0,0,0,torso);
 
   // Floating Head
-  const head=new THREE.Group();head.position.set(0,2.9,0);g.add(head);
+  head=new THREE.Group();head.position.set(0,2.9,0);g.add(head);
   mk(new THREE.BoxGeometry(.7,.8,.7),rockMat,0,0,0,0,0,0,head);
   mk(new THREE.BoxGeometry(.18,.08,.1),runeMat,-.16,.1,.34,0,0,0,head);
   mk(new THREE.BoxGeometry(.18,.08,.1),runeMat,.16,.1,.34,0,0,0,head);
 
   // Heavy stone arms
-  const armL=mk(new THREE.BoxGeometry(.45,1.3,.45),rockMat,-1.05,1.4,.1);
-  const armR=mk(new THREE.BoxGeometry(.45,1.3,.45),rockMat,1.05,1.4,.1);
+  armL=mk(new THREE.BoxGeometry(.45,1.3,.45),rockMat,-1.05,1.4,.1);
+  armR=mk(new THREE.BoxGeometry(.45,1.3,.45),rockMat,1.05,1.4,.1);
 
   // Orbiting rune stones
   const runes=[];
@@ -1092,8 +1268,10 @@ function buildGuardian(levelIdx){
    torso.position.y=1.8+Math.sin(t*1.8)*.08;
    head.position.y=2.9+Math.sin(t*2.2)*.06;
    head.rotation.y=Math.sin(t*.9)*.2;
-   armL.rotation.x=Math.sin(t*1.5)*.15;
-   armR.rotation.x=-Math.sin(t*1.5)*.15;
+   if(G.guardian&&G.guardian.state!=='attack'){
+    armL.rotation.x=Math.sin(t*1.5)*.15;
+    armR.rotation.x=-Math.sin(t*1.5)*.15;
+   }
    for(let k=0;k<3;k++){
     const a=t*1.8+k*(Math.PI*2/3);
     runes[k].position.set(Math.cos(a)*1.7,2.0+Math.sin(t*2+k)*.35,Math.sin(a)*1.7);
@@ -1120,7 +1298,7 @@ function buildGuardian(levelIdx){
   mk(new THREE.CylinderGeometry(1.2,1.5,.3,6),darkCrystalMat,0,.15,0);
 
   // Floating crystalline spire body
-  const body=new THREE.Group();body.position.set(0,2.2,0);g.add(body);
+  body=new THREE.Group();body.position.set(0,2.2,0);g.add(body);
   mk(new THREE.ConeGeometry(.7,2.2,6),crystalMat,0,.4,0,0,0,0,body);
   mk(new THREE.ConeGeometry(.65,1.6,6),crystalMat,0,-.6,0,Math.PI,0,0,body);
 
@@ -1128,14 +1306,14 @@ function buildGuardian(levelIdx){
   const heart=mk(new THREE.OctahedronGeometry(.38,0),coreMat,0,.2,0,0,0,0,body);
 
   // Floating crystal crown
-  const crown=new THREE.Group();crown.position.set(0,3.6,0);g.add(crown);
+  crown=new THREE.Group();crown.position.set(0,3.6,0);g.add(crown);
   for(let k=0;k<5;k++){
    const a=k*Math.PI*2/5;
    mk(new THREE.ConeGeometry(.14,.7,5),crystalMat,Math.cos(a)*.45,0,Math.sin(a)*.45,.3,-a,0,crown);
   }
 
   // Floating orbiting crystal blade shards
-  const shards=[];
+  shards=[];
   for(let k=0;k<4;k++){
    const sh=mk(new THREE.ConeGeometry(.18,1.1,4),coreMat,0,0,0);
    sh.rotation.x=Math.PI/2;
@@ -1157,7 +1335,7 @@ function buildGuardian(levelIdx){
     return;
    }
    body.position.y=2.2+Math.sin(t*2.2)*.15;
-   body.rotation.y+=dt*.6;
+   if(G.guardian&&G.guardian.state!=='attack')body.rotation.y+=dt*.6;
    crown.position.y=3.6+Math.sin(t*2.2+.5)*.12;
    crown.rotation.y-=dt*.9;
    heart.rotation.x=t*1.5;
@@ -1193,13 +1371,13 @@ function buildGuardian(levelIdx){
   mk(new THREE.BoxGeometry(.5,1.4,.6),darkArmorMat,.55,1.0,0);
 
   // Titan Torso & Chestplate
-  const torso=new THREE.Group();torso.position.set(0,2.6,0);g.add(torso);
+  torso=new THREE.Group();torso.position.set(0,2.6,0);g.add(torso);
   mk(new THREE.BoxGeometry(1.5,1.4,.9),darkArmorMat,0,0,0,0,0,0,torso);
   mk(new THREE.BoxGeometry(1.6,.7,1.0),goldMat,0,.35,0,0,0,0,torso);
   mk(new THREE.CylinderGeometry(.32,.32,.12,12),coreMat,0,.3,.52,Math.PI/2,0,0,torso);
 
   // Titan Head & Helm
-  const head=new THREE.Group();head.position.set(0,3.8,0);g.add(head);
+  head=new THREE.Group();head.position.set(0,3.8,0);g.add(head);
   mk(new THREE.BoxGeometry(.7,.8,.7),darkArmorMat,0,0,0,0,0,0,head);
   mk(new THREE.ConeGeometry(.2,.6,4),goldMat,0,.65,0,0,0,0,head);
   mk(new THREE.BoxGeometry(.5,.12,.1),coreMat,0,.08,.36,0,0,0,head);
@@ -1209,11 +1387,11 @@ function buildGuardian(levelIdx){
   mk(new THREE.BoxGeometry(.75,.6,.8),goldMat,1.15,.6,0,0,0,-.25,torso);
 
   // Titan Arms
-  const armL=mk(new THREE.BoxGeometry(.45,1.6,.45),darkArmorMat,-1.15,2.2,0);
-  const armR=mk(new THREE.BoxGeometry(.45,1.6,.45),darkArmorMat,1.15,2.2,0);
+  armL=mk(new THREE.BoxGeometry(.45,1.6,.45),darkArmorMat,-1.15,2.2,0);
+  armR=mk(new THREE.BoxGeometry(.45,1.6,.45),darkArmorMat,1.15,2.2,0);
 
   // Imperial Halberd in right hand
-  const halberd=new THREE.Group();halberd.position.set(1.4,2.2,.4);g.add(halberd);
+  halberd=new THREE.Group();halberd.position.set(1.4,2.2,.4);g.add(halberd);
   mk(new THREE.CylinderGeometry(.06,.06,4.4,8),darkArmorMat,0,.6,0,0,0,0,halberd);
   mk(new THREE.BoxGeometry(.1,.9,.55),goldMat,0,2.6,.25,0,0,0,halberd);
   mk(new THREE.ConeGeometry(.12,.8,4),goldMat,0,3.1,0,0,0,0,halberd);
@@ -1239,8 +1417,10 @@ function buildGuardian(levelIdx){
    torso.position.y=2.6+Math.sin(t*1.6)*.06;
    head.rotation.y=Math.sin(t*.8)*.18;
    halo.rotation.z+=dt*.6;
-   armR.rotation.x=Math.sin(t*1.2)*.1;
-   halberd.position.y=2.2+Math.sin(t*1.6)*.06;
+   if(G.guardian&&G.guardian.state!=='attack'){
+    armR.rotation.x=Math.sin(t*1.2)*.1;
+    halberd.position.y=2.2+Math.sin(t*1.6)*.06;
+   }
    coreLight.intensity=1.9+Math.sin(t*4)*.35;
   });
  }
@@ -1249,13 +1429,150 @@ function buildGuardian(levelIdx){
   animParts.forEach(fn=>fn(t,dt));
  });
 
- return{group:g,col,coreLight,x:gx,z:gz,defeated:false};
+ return{
+  group:g,col,coreLight,x:gx,z:gz,
+  homeX:gx,homeZ:gz,levelIdx,
+  state:'idle',
+  speed:[2.2,2.5,2.8][levelIdx],
+  attackRange:2.4,detectRange:11.0,
+  attackCooldown:0,attackAnimTimer:0,attackHitDone:false,
+  armL,armR,halberd,torso,head,body,crown,shards,
+  defeated:false
+ };
+}
+
+function updateGuardianAI(dt){
+ const gd=G.guardian;
+ if(!gd||gd.defeated||G.guardianDefeated||ST!=='play')return;
+
+ const dist=Math.hypot(P.x-gd.group.position.x,P.z-gd.group.position.z);
+ const distHome=Math.hypot(gd.group.position.x-gd.homeX,gd.group.position.z-gd.homeZ);
+
+ if(gd.attackCooldown>0)gd.attackCooldown-=dt;
+
+ if(gd.state==='idle'){
+  if(dist<=gd.detectRange){
+   gd.state='detect';
+   gd.detectTimer=0.35;
+   if(!G.guardianAlerted){
+    G.guardianAlerted=true;
+    sfx('guardianAlert');
+    toast(`${LV[G.lv].n} Guardian awakens! Approach to accept its challenge.`,'warn');
+   }
+  }
+ }else if(gd.state==='detect'){
+  const targetYaw=Math.atan2(P.x-gd.group.position.x,P.z-gd.group.position.z);
+  let dy=targetYaw-gd.group.rotation.y;
+  dy=Math.atan2(Math.sin(dy),Math.cos(dy));
+  gd.group.rotation.y+=dy*Math.min(1,dt*6);
+
+  gd.detectTimer=(gd.detectTimer||0.35)-dt;
+  if(gd.detectTimer<=0){
+   gd.state='chase';
+  }
+ }else if(gd.state==='chase'){
+  if(dist>24.0){
+   // Return towards home position
+   const toHomeYaw=Math.atan2(gd.homeX-gd.group.position.x,gd.homeZ-gd.group.position.z);
+   let dy=toHomeYaw-gd.group.rotation.y;
+   dy=Math.atan2(Math.sin(dy),Math.cos(dy));
+   gd.group.rotation.y+=dy*Math.min(1,dt*4);
+
+   const step=gd.speed*dt;
+   gd.group.position.x+=Math.sin(toHomeYaw)*step;
+   gd.group.position.z+=Math.cos(toHomeYaw)*step;
+   if(distHome<1.5){
+    gd.state='idle';
+   }
+  }else{
+   // Turn to face player
+   const targetYaw=Math.atan2(P.x-gd.group.position.x,P.z-gd.group.position.z);
+   let dy=targetYaw-gd.group.rotation.y;
+   dy=Math.atan2(Math.sin(dy),Math.cos(dy));
+   gd.group.rotation.y+=dy*Math.min(1,dt*7);
+
+   if(dist<=gd.attackRange&&gd.attackCooldown<=0){
+    gd.state='attack';
+    gd.attackAnimTimer=0.7;
+    gd.attackHitDone=false;
+   }else if(dist>gd.attackRange-0.3){
+    const step=gd.speed*dt;
+    gd.group.position.x+=Math.sin(targetYaw)*step;
+    gd.group.position.z+=Math.cos(targetYaw)*step;
+   }
+  }
+
+  gd.x=gd.group.position.x;
+  gd.z=gd.group.position.z;
+  if(gd.col){
+   gd.col.x=gd.x;
+   gd.col.z=gd.z;
+  }
+  if(G.guardianIt){
+   G.guardianIt.x=gd.x;
+   G.guardianIt.z=gd.z;
+  }
+ }else if(gd.state==='attack'){
+  gd.attackAnimTimer-=dt;
+
+  if(gd.levelIdx===0){
+   if(gd.armL&&gd.armR){
+    if(gd.attackAnimTimer>0.35){
+     gd.armL.rotation.x=-2.2;gd.armR.rotation.x=-2.2;
+    }else{
+     gd.armL.rotation.x=1.2;gd.armR.rotation.x=1.2;
+    }
+   }
+  }else if(gd.levelIdx===1){
+   if(gd.body){
+    gd.body.rotation.y+=dt*18;
+   }
+  }else{
+   if(gd.halberd){
+    gd.halberd.rotation.z=-0.8+Math.sin((0.7-gd.attackAnimTimer)/0.7*Math.PI)*2.2;
+   }
+  }
+
+  if(gd.attackAnimTimer<=0.35&&!gd.attackHitDone){
+   gd.attackHitDone=true;
+   if(dist<=gd.attackRange+0.6){
+    damagePlayer(25,`${LV[G.lv].n} Guardian strike`);
+    const kx=Math.sin(gd.group.rotation.y)*1.8;
+    const kz=Math.cos(gd.group.rotation.y)*1.8;
+    P.x+=kx;P.z+=kz;
+   }
+  }
+
+  if(gd.attackAnimTimer<=0){
+   gd.state='chase';
+   gd.attackCooldown=2.2;
+   if(gd.armL&&gd.armR){gd.armL.rotation.x=0;gd.armR.rotation.x=0}
+  }
+ }
 }
 
 /* ===== level building ===== */
 let r=Math.random;
 const KP=[];const free=(x,z,m=5)=>Math.abs(x)>4&&Math.abs(z+10)>3&&KP.every(p=>Math.hypot(x-p[0],z-p[1])>m);
-const INS=[[[-15,8]],[[-17,6],[17,-3]],[[-20,-2],[20,-2],[0,16]]],MP=[[19.0,-2.4],[22.0,3.4],[-23.6,14.5]];
+const INS=[[[-15,8]],[[-17,6],[17,-3]],[[-20,-2],[20,-2],[0,16]]];
+const CHEST_SPAWNS=[
+ [
+  {pos:[19.0,-2.4],yaw:-Math.PI*0.45,camOff:new THREE.Vector3(-1.8,1.6,1.4),range:2.8},
+  {pos:[14.5,-6.5],yaw:-Math.PI*0.65,camOff:new THREE.Vector3(-1.6,1.5,1.3),range:2.8},
+  {pos:[-12.5,3.5],yaw:Math.PI*0.35,camOff:new THREE.Vector3(1.7,1.5,1.2),range:2.8}
+ ],
+ [
+  {pos:[22.0,3.4],yaw:-Math.PI*0.55,camOff:new THREE.Vector3(-1.5,1.4,1.2),range:2.4},
+  {pos:[19.8,8.2],yaw:-Math.PI*0.75,camOff:new THREE.Vector3(-1.4,1.3,1.1),range:2.4},
+  {pos:[-14.5,-5.5],yaw:Math.PI*0.45,camOff:new THREE.Vector3(1.5,1.4,1.1),range:2.4}
+ ],
+ [
+  {pos:[-23.6,14.5],yaw:Math.PI*0.35,camOff:new THREE.Vector3(1.5,1.3,0.9),range:2.1},
+  {pos:[-23.6,5.5],yaw:Math.PI*0.25,camOff:new THREE.Vector3(1.4,1.3,0.9),range:2.1},
+  {pos:[-14.5,-2.5],yaw:Math.PI*0.55,camOff:new THREE.Vector3(1.4,1.2,0.9),range:2.1}
+ ]
+];
+const MP=[[19.0,-2.4],[22.0,3.4],[-23.6,14.5]];
 
 function pts(n,sp,c,s,y0,y1){
  const g=new THREE.BufferGeometry(),a=new Float32Array(n*3);
@@ -1368,15 +1685,13 @@ function build(i){
  G.guardianIt=guardianIt;
 
  // wooden treasure chest (hidden in progressive secret locations)
- const [mx,mz]=MP[i];
- const chestYaws=[-Math.PI*0.45,-Math.PI*0.55,Math.PI*0.35];
- const chestCamOffs=[
-  new THREE.Vector3(-1.8,1.6,1.4),
-  new THREE.Vector3(-1.5,1.4,1.2),
-  new THREE.Vector3(1.5,1.3,0.9)
- ];
- const chestRanges=[2.8,2.4,2.1];
- CHEST=buildTreasureChest(mx,mz,i,chestYaws[i],chestCamOffs[i]);
+ const spawnList=CHEST_SPAWNS[i];
+ const spawnData=spawnList[RI(0,spawnList.length-1)];
+ const [mx,mz]=spawnData.pos;
+ G.chestSpawnIdx=spawnList.indexOf(spawnData);
+ G.chestPos=[mx,mz];
+ MP[i]=[mx,mz];
+ CHEST=buildTreasureChest(mx,mz,i,spawnData.yaw,spawnData.camOff);
  const chestLabels=[
   'Hidden Forest Chest — Locked (Solve Puzzle)',
   'Hidden Crystal Chest — Locked (Solve Puzzle)',
@@ -1396,7 +1711,7 @@ function build(i){
   if(G.chestState==='opened'){toast(`Chest already opened — ${L.kn} already obtained.`);return}
   if(G.chestState==='opening')return;
   openPuz('chest');
- },true,{prompt:'Press E to Interact',range:chestRanges[i],subCls:'warn'});
+ },true,{prompt:'Press E to Interact',range:spawnData.range,subCls:'warn'});
  G.chestIt=chestIt;
 
  // chest subtle ambient pulse while locked
@@ -1647,12 +1962,13 @@ async function startLevel(i){
   G={
    on:true,lv:i,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,
    cine:0,ct:0,keyGranted:false,advancing:false,
-   lives:3,levelTimer:LV_TIMES[i],levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,
+   lives:3,hp:100,maxHp:100,invulnTimer:0,levelTimer:LV_TIMES[i],levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,
    altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}
   };
   pb.style.width='60%';await fr();
   build(i);pb.style.width='100%';await fr();
   updateHeartsHUD();
+ updateHealthHUD();
   hudUpd();ui(null);
   const startToasts=[
    'Explore the Forgotten Forest to find the hidden Wooden Treasure Chest!',
@@ -1789,7 +2105,7 @@ addEventListener('blur',()=>{K={}});
 document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement&&ST==='play'){lockT=performance.now();pause()}});
 addEventListener('mousedown',e=>{if(ST==='play'&&e.target===cv){drag=true;try{cv.requestPointerLock()}catch(x){}}});
 addEventListener('mouseup',()=>drag=false);
-addEventListener('mousemove',e=>{if(ST==='play'&&(document.pointerLockElement||drag)){yaw-=e.movementX*.003;pitch=Math.max(-.15,Math.min(1.2,pitch+e.movementY*.003))}});
+addEventListener('mousemove',e=>{if(ST==='play'&&(document.pointerLockElement||drag)){yaw-=e.movementX*mouseSens;pitch=Math.max(-.25,Math.min(1.1,pitch+e.movementY*mouseSens))}});
 
 let near=null;
 function tryInteract(){
@@ -1842,6 +2158,11 @@ function animP(t,dt){
  if(P.act>0)ra=-1.7+Math.sin(t*14)*.2;
  u.la.rotation.x=la;u.ra.rotation.x=ra;u.ll.rotation.x=ll;u.rl.rotation.x=P.g&&P.sp?-ll:(P.g?0:-.4);
  PM.children[0].position.y=1.15+(P.sp&&P.g?Math.abs(Math.sin(t*10))*.05:0);
+ if(G.invulnTimer>0){
+  PM.visible=Math.floor(t*18)%2===0;
+ }else{
+  PM.visible=true;
+ }
 }
 
 function animChestCine(dt){
@@ -1897,6 +2218,8 @@ function tick(){
  requestAnimationFrame(tick);if(!renderer)return;
  const dt=Math.min(CL.getDelta(),.05),t=CL.elapsedTime;
  if(G.on){
+  if(G.invulnTimer>0)G.invulnTimer=Math.max(0,G.invulnTimer-dt);
+
   if(ST==='play'||ST==='puz'||G.cine){
    SV.run.t+=dt;
    G.levelTimerElapsed=(G.levelTimerElapsed||0)+dt;
@@ -1904,11 +2227,11 @@ function tick(){
     G.levelTimer-=dt;
     if(G.levelTimer<=0){
      G.levelTimer=0;
-     deductLife('Level exploration timer expired!');
-     if(G.lives>0){
+     damagePlayer(25,'Level exploration timer expired!');
+     if(G.hp>0){
       G.levelTimer=LV_TIMES[G.lv];
       P.x=G.cp.x;P.z=G.cp.z;P.y=0;yaw=G.cp.yaw;
-      toast('Time expired! Respawned at checkpoint (-1 Life).','warn');
+      toast('Time expired! Respawned at checkpoint (-25 HP).','warn');
      }
     }
    }
@@ -1924,9 +2247,9 @@ function tick(){
    }
    if(G.chestTimer<=0){
     G.chestTimer=180;
-    deductLife('Chest lock timer expired! Padlock re-sealed.');
-    if(G.lives>0){
-     drawPuz('Timer expired! Chest lock re-sealed (-1 Life).','no');
+    damagePlayer(25,'Chest lock timer expired! Padlock re-sealed.');
+    if(G.hp>0){
+     drawPuz('Timer expired! Chest lock re-sealed (-25 HP).','no');
     }
    }
   }
@@ -1945,17 +2268,10 @@ function tick(){
    }
   }
 
-  // Guardian alert sound and toast when approaching
-  if(!G.guardianDefeated&&G.guardianPos&&ST==='play'){
-   const gd=Math.hypot(P.x-G.guardianPos[0],P.z-G.guardianPos[1]);
-   if(gd<7.0&&!G.guardianAlerted){
-    G.guardianAlerted=true;
-    sfx('guardianAlert');
-    toast(`${LV[G.lv].n} Guardian awakens! Approach to accept its challenge.`,'warn');
-   }
+  if(ST==='play'&&!G.cine&&!G.advancing){
+   updateGuardianAI(dt);
+   move(dt);
   }
-
-  if(ST==='play'&&!G.cine&&!G.advancing)move(dt);
   ANI.forEach(f=>f(t,dt));
   animP(t,dt);
 
@@ -1990,20 +2306,42 @@ function tick(){
    }
   }
 
-  let tg=new THREE.Vector3(P.x,P.y+1.7,P.z),want;
+  let tg=new THREE.Vector3(P.x,P.y+1.5,P.z),want;
   if(G.cine&&CHEST){
    tg.set(CHEST.x,1.0*(CHEST.sc||1),CHEST.z);
    const co=CHEST.camOff||new THREE.Vector3(2.0,2.2,2.4);
    want=new THREE.Vector3(CHEST.x+co.x,co.y,CHEST.z+co.z);
   }else{
-   const cp=Math.cos(pitch);let d=7;
-   for(;d>1.2;d-=.4){
-    const x=tg.x+Math.sin(yaw)*cp*d,z=tg.z+Math.cos(yaw)*cp*d,y=tg.y+Math.sin(pitch)*d;
-    if(y>.4&&!hit(x,y,z))break;
+   const baseDist=4.0;
+   const cp=Math.cos(pitch);
+   const dirX=Math.sin(yaw)*cp;
+   const dirY=Math.sin(pitch);
+   const dirZ=Math.cos(yaw)*cp;
+
+   let clearDist=baseDist;
+   for(let s=1.0;s<=baseDist;s+=0.25){
+    const cx=tg.x+dirX*s;
+    const cy=tg.y+dirY*s;
+    const cz=tg.z+dirZ*s;
+    if(cy<0.4||hit(cx,cy,cz)){
+     clearDist=Math.max(1.2,s-0.2);
+     break;
+    }
    }
-   want=new THREE.Vector3(tg.x+Math.sin(yaw)*cp*d,Math.max(.5,tg.y+Math.sin(pitch)*d),tg.z+Math.cos(yaw)*cp*d);
+
+   if(clearDist<camDist){
+    camDist=clearDist;
+   }else{
+    camDist+=(clearDist-camDist)*Math.min(1,dt*8);
+   }
+
+   want=new THREE.Vector3(
+    tg.x+dirX*camDist,
+    Math.max(0.4,tg.y+dirY*camDist),
+    tg.z+dirZ*camDist
+   );
   }
-  cam.position.lerp(want,1-Math.exp(-(G.cine?4:14)*dt));
+  cam.position.lerp(want,1-Math.exp(-(G.cine?4:16)*dt));
   cam.lookAt(tg);
 
   near=null;

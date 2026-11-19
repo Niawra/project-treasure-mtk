@@ -4,6 +4,10 @@
   <div id="hud-left">
     <div id="hud-status" class="pn sm">
       <div id="hud-hearts"></div>
+      <div id="hud-hp-wrap">
+        <div id="hud-hp-label"><span>HP</span><span id="hp-val">100</span>/100</div>
+        <div id="hud-hp-track"><div id="hud-hp-fill" style="width:100%"></div></div>
+      </div>
       <div id="hud-timer">⏱️ 10:00</div>
     </div>
     <div id="obj" class="pn sm"></div>
@@ -20,7 +24,7 @@
 <div id="load" class="ov on"><h1>PROJECT TREASURE</h1><div class="bar"><div id="pb"></div></div><div id="lt" class="sub">Loading…</div><button id="lerr" data-a="menu" style="display:none">Back to Menu</button></div>
 <div id="menu" class="ov"><h1>PROJECT TREASURE</h1><p class="sub">THE LOST CIPHER</p><div class="mn"><button data-a="new">Start Game</button><button data-a="cont" id="bc">Continue</button><button data-a="lvls">Level Selection</button><button data-a="sett">Settings</button><button data-a="cred">Credits</button></div></div>
 <div id="lvls" class="ov"><h2>Select Level</h2><div class="cards" id="cards"></div><button data-a="menu">Back</button></div>
-<div id="sett" class="ov"><div class="pn"><h2>Settings</h2><p>Master volume <input type="range" id="vm" min="0" max="1" step=".05" value=".7"></p><p>Music volume <input type="range" id="vu" min="0" max="1" step=".05" value=".5"></p><p><label><input type="checkbox" id="mu"> Mute all</label></p><button data-a="sback">Back</button></div></div>
+<div id="sett" class="ov"><div class="pn"><h2>Settings</h2><p>Master volume <input type="range" id="vm" min="0" max="1" step=".05" value=".7"></p><p>Music volume <input type="range" id="vu" min="0" max="1" step=".05" value=".5"></p><p>Mouse sensitivity <input type="range" id="sens" min="0.001" max="0.005" step="0.0005" value="0.0022"></p><p><label><input type="checkbox" id="mu"> Mute all</label></p><button data-a="sback">Back</button></div></div>
 <div id="cred" class="ov"><div class="pn"><h2>Credits</h2><p>Design, code and procedural art generated with Claude. Rendered with Three.js. All sounds are synthesized live with Web Audio.</p><button data-a="menu">Back</button></div></div>
 <div id="puz" class="ov"><div class="pn" id="pz" style="width:520px"></div></div>
 <div id="sol" class="ov"><div class="pn sol-pn" id="sol-box"></div></div>
