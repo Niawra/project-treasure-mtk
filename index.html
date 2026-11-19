@@ -2,6 +2,10 @@
 <link rel="stylesheet" href="styles/main.css"></head><body>
 <div id="hud">
   <div id="hud-left">
+    <div id="hud-status" class="pn sm">
+      <div id="hud-hearts"></div>
+      <div id="hud-timer">⏱️ 10:00</div>
+    </div>
     <div id="obj" class="pn sm"></div>
     <div id="keyhud" class="pn sm"></div>
   </div>
@@ -23,6 +27,7 @@
 <div id="inv" class="ov"><div class="pn" style="width:520px"><h2>Inventory</h2><div id="il"></div><p id="idesc" class="hh">Select an item to inspect it.</p><button data-a="resume">Close</button></div></div>
 <div id="quest" class="ov"><div class="pn" style="width:520px"><h2>Quest Log</h2><div id="ql"></div><button data-a="resume">Close</button></div></div>
 <div id="pause" class="ov"><div class="pn mn" style="width:260px"><h2 style="text-align:center">Paused</h2><button data-a="resume">Resume</button><button data-a="restart">Restart Level</button><button data-a="sett">Settings</button><button data-a="menu">Return to Main Menu</button></div></div>
+<div id="game-over" class="ov"><div class="pn go-pn"><div class="go-badge">QUEST FAILED</div><h1 class="go-title">GAME OVER</h1><p class="go-reason" id="go-reason">Your vitality was depleted.</p><div id="go-stats" class="go-stats"></div><div class="go-actions"><button data-a="retry" class="btn-primary">Retry from Checkpoint</button><button data-a="restart">Restart Level</button><button data-a="menu">Return to Main Menu</button></div></div></div>
 <div id="vic" class="ov"><div class="pn" style="text-align:center"><h1>TREASURE FOUND!</h1><p>The Lost Cipher is broken. The legendary treasure is yours.</p><div id="vs"></div><button data-a="replay">Play Again</button><button data-a="menu">Main Menu</button></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="src/main.js"></script></body></html>

@@ -8,27 +8,174 @@ const save=()=>{try{localStorage.setItem('ptlc',JSON.stringify(SV))}catch(e){}};
 const KEY_SVG='<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>';
 
 /* ===== math / puzzles ===== */
-const F=(n,a,b)=>({n,a,b,ap:x=>a*x+b,rhs:`${a==1?'':a}x ${b<0?'− '+(-b):'+ '+b}`,txt:`${n}(x) = ${a==1?'':a}x ${b<0?'− '+(-b):'+ '+b}`,sub:v=>`${a==1?v:a+'('+v+')'} ${b<0?'− '+(-b):'+ '+b}`});
+const F=(n,a,b)=>({
+ n,a,b,
+ ap:x=>a*x+b,
+ inv:y=>(y-b)/a,
+ rhs:`${a==1?'':a}x ${b<0?'− '+(-b):'+ '+b}`,
+ txt:`${n}(x) = ${a==1?'':a}x ${b<0?'− '+(-b):'+ '+b}`,
+ sub:v=>`${a==1?v:a+'('+v+')'} ${b<0?'− '+(-b):'+ '+b}`,
+ invTxt:a==1?`${n}⁻¹(x) = x ${b<0?'+ '+(-b):'− '+b}`:`${n}⁻¹(x) = (x ${b<0?'+ '+(-b):'− '+b}) / ${a}`,
+ invSub:v=>a==1?`${v} ${b<0?'+ '+(-b):'− '+b}`:`(${v} ${b<0?'+ '+(-b):'− '+b}) / ${a}`
+});
+
+const LV_TIMES=[600,720,900]; // Level countdown timers: 10m, 12m, 15m
+
 const LV=[
- {n:'The Forgotten Forest',d:'Easy',kn:'Forest Key',kc:0xffd24c,fs:[F('f',2,3)],x:5,bg:'linear-gradient(#7fb069,#1f3a2b)'},
- {n:'The Crystal Cavern',d:'Medium',kn:'Crystal Key',kc:0x7be8ff,fs:[F('f',2,3),F('g',1,-1)],x:4,bg:'linear-gradient(#4aa8ff,#0b1230)'},
- {n:'The Final Vault',d:'Hard',kn:'Vault Key',kc:0xffe066,fs:[F('f',2,1),F('g',1,3),F('h',3,-2)],x:2,bg:'linear-gradient(#e0b23c,#2a1c08)'}
+ {
+  n:'The Forgotten Forest',d:'Easy',kn:'Forest Key',kc:0xffd24c,
+  fs:[F('f',2,3)],compX:5,guardX:4,chestY:13,
+  bg:'linear-gradient(#7fb069,#1f3a2b)'
+ },
+ {
+  n:'The Crystal Cavern',d:'Medium',kn:'Crystal Key',kc:0x7be8ff,
+  fs:[F('f',2,3),F('g',1,-1)],compX:4,guardX:6,chestY:9,
+  bg:'linear-gradient(#4aa8ff,#0b1230)'
+ },
+ {
+  n:'The Final Vault',d:'Hard',kn:'Vault Key',kc:0xffe066,
+  fs:[F('f',2,1),F('g',1,3),F('h',3,-2)],compX:2,guardX:1,chestY:15,
+  bg:'linear-gradient(#e0b23c,#2a1c08)'
+ }
 ];
-function mkPuz(fns,x){ // fns listed outermost -> innermost
- let v=x;for(let i=fns.length-1;i>=0;i--)v=fns[i].ap(v);
- const comp=fns.map(f=>f.ap).reduce((a,b)=>y=>a(b(y)));if(comp(x)!==v)throw Error('Puzzle verification failed');
- const nm=fns.map(f=>f.n),nest=nm.reduceRight((a,n)=>n+'('+a+')',x);
- return{fns,x,ans:v,nest,nt:fns.length==1?`f(${x})`:`(${nm.join(' ∘ ')})(${x}) = ${nest}`,hs:0,
-  hints:()=>{const i=fns[fns.length-1],o=fns.length>1?fns[fns.length-2]:null;return[
-   `Work from the inside out. The innermost function is ${i.n}, so evaluate ${i.n}(${x}) first.`,
-   `Substitute x = ${x} into ${i.n}: ${i.n}(${x}) = ${i.sub(x)}. Compute that value.`,
-   o?`Now treat your result as the new input for ${o.n}, i.e. ${o.n}(□) = ${o.sub('□')}. Keep moving outward until you finish with ${fns[0].n}.`:`Do the multiplication first, then the addition or subtraction: ${i.sub(x)}.`]}}
-}
+
 const QD=[
- [['explore','Explore the Forgotten Forest'],['find','Discover the hidden Forest Chest'],['chest','Unlock the Wooden Treasure Chest'],['key','Obtain the Forest Key'],['door','Unlock the Forest Exit Door'],['next','Enter the exit portal']],
- [['explore','Explore the Crystal Cavern'],['find','Discover the hidden Crystal Grotto'],['chest','Solve the Crystal Chest puzzle'],['key','Obtain the Crystal Key'],['door','Unlock the Cavern Exit Door'],['next','Enter the exit portal']],
- [['explore','Enter the Final Vault'],['find','Uncover the Secret Treasury Vault'],['chest','Solve the Vault Chest 3-function puzzle'],['key','Obtain the Vault Key'],['door','Unlock the Final Vault Door'],['treasure','Claim the Legendary Treasure']]
+ [
+  ['explore','Explore the Forgotten Forest'],
+  ['insc','Find the ancient inscription'],
+  ['comp','Solve the function composition puzzle'],
+  ['reveal','Reveal the treasure location'],
+  ['travel','Travel to the treasure area'],
+  ['guardian','Defeat the forest guardian'],
+  ['inverse','Solve the inverse function challenge'],
+  ['chest','Open the first treasure chest']
+ ],
+ [
+  ['explore','Explore the Crystal Cavern'],
+  ['insc','Find both function inscriptions'],
+  ['comp','Solve the composition puzzle'],
+  ['reveal','Reveal the treasure location'],
+  ['travel','Travel to the treasure area'],
+  ['guardian','Defeat the crystal guardian'],
+  ['inverse','Solve the inverse composition challenge'],
+  ['chest','Open the second treasure chest']
+ ],
+ [
+  ['explore','Explore the Final Vault'],
+  ['insc','Find all three function inscriptions'],
+  ['comp','Solve the composition puzzle'],
+  ['reveal','Reveal the final treasure location'],
+  ['travel','Travel to the treasure area'],
+  ['guardian','Defeat the final guardian'],
+  ['inverse','Solve the inverse composition challenge'],
+  ['chest','Unlock the final treasure chest']
+ ]
 ];
+
+const formatTime=s=>{
+ const m=Math.floor(Math.max(0,s)/60),sec=Math.floor(Math.max(0,s)%60);
+ return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+};
+
+function mkCompPuz(lvIdx){
+ const L=LV[lvIdx],fns=L.fs,x=L.compX;
+ let v=x;for(let i=fns.length-1;i>=0;i--)v=fns[i].ap(v);
+ const nm=fns.map(f=>f.n),nest=nm.reduceRight((a,n)=>n+'('+a+')',x);
+ return{
+  type:'comp',kind:'altar',fns,x,ans:v,nest,
+  title:['Ancient Cipher Altar — Level 1','Crystal Cipher Altar — Level 2','Vault Cipher Altar — Level 3'][lvIdx],
+  fl:['Evaluate the function f(x) to decipher the encrypted forest coordinates.',
+      'Compose the two functions from the inside out to reveal the crystal grotto location.',
+      'Compose the three functions from innermost to outermost to reveal the secret vault coordinates.'][lvIdx],
+  nt:fns.length==1?`f(${x})`:`(${nm.join(' ∘ ')})(${x}) = ${nest}`,
+  hs:0,
+  hints:()=>{
+   const i=fns[fns.length-1],o=fns.length>1?fns[fns.length-2]:null;
+   return[
+    `Work from the inside out. The innermost function is ${i.n}, so evaluate ${i.n}(${x}) first.`,
+    `Substitute x = ${x} into ${i.n}: ${i.n}(${x}) = ${i.sub(x)}. Compute that value.`,
+    o?`Now treat your result as the new input for ${o.n}, i.e. ${o.n}(□) = ${o.sub('□')}. Keep moving outward until you finish with ${fns[0].n}.`:`Do the multiplication first, then the addition: ${i.sub(x)}.`
+   ];
+  }
+ };
+}
+
+function mkGuardianPuz(lvIdx){
+ const L=LV[lvIdx],fns=L.fs,x=L.guardX;
+ let v=x;for(let i=fns.length-1;i>=0;i--)v=fns[i].ap(v);
+ const nm=fns.map(f=>f.n),nest=nm.reduceRight((a,n)=>n+'('+a+')',x);
+ const titles=['Forest Stone Guardian — Trial','Crystal Sentinel — Trial','Temple Titan Guardian — Trial'];
+ const lore=[
+  '“Halt, mortal! The sacred glade is barred to those blind to mathematics. Prove your worth: evaluate the primal function or face expulsion!”',
+  '“The crystal harmonics reject the unworthy! Harmonize with the dual-function composition from inside out, or be cast back!”',
+  '“By order of the Ancient Architects, none shall approach the Royal Chest without mastering the tri-cipher! Solve or fall!”'
+ ];
+ return{
+  type:'guardian',kind:'guardian',fns,x,ans:v,nest,
+  title:titles[lvIdx],
+  lore:lore[lvIdx],
+  fl:'Answer the Guardian’s mathematical inquiry correctly to deactivate its protective ward.',
+  nt:fns.length==1?`f(${x})`:`(${nm.join(' ∘ ')})(${x}) = ${nest}`,
+  hs:0,
+  hints:()=>{
+   const i=fns[fns.length-1];
+   return[
+    `Evaluate ${i.n}(${x}) first.`,
+    `Substitute ${x} into ${i.txt}: ${i.sub(x)}.`,
+    `Continue to the outer function with your calculated intermediate value.`
+   ];
+  }
+ };
+}
+
+function mkInversePuz(lvIdx){
+ const L=LV[lvIdx],fns=L.fs,y=L.chestY;
+ let ans;
+ if(lvIdx===0){
+  ans=fns[0].inv(y);
+ }else if(lvIdx===1){
+  ans=fns[1].inv(fns[0].inv(y));
+ }else{
+  ans=fns[2].inv(fns[1].inv(fns[0].inv(y)));
+ }
+ const nm=fns.map(f=>f.n);
+ const revNm=[...nm].reverse();
+ const titles=['Wooden Chest Lock — Inverse Function','Crystal Chest Lock — Inverse Composition','Vault Chest Lock — Triple Inverse Composition'];
+ const fls=[
+  'Calculate the inverse function f⁻¹(x) to decrypt the padlock. Reverse operations: subtract 3, then divide by 2.',
+  'Calculate the inverse of the composite function: (f ∘ g)⁻¹ = g⁻¹ ∘ f⁻¹. Remember: composition order is reversed!',
+  'Calculate the inverse of the 3-function composition: (f ∘ g ∘ h)⁻¹ = h⁻¹ ∘ g⁻¹ ∘ f⁻¹. Work from f⁻¹ through g⁻¹ to h⁻¹!'
+ ];
+ const nt=fns.length===1?`f⁻¹(${y})`:`(${nm.join(' ∘ ')})⁻¹(${y}) = (${revNm.map(n=>n+'⁻¹').join(' ∘ ')})(${y})`;
+ return{
+  type:'inverse',kind:'chest',fns,x:y,ans,
+  title:titles[lvIdx],
+  fl:fls[lvIdx],
+  nt,
+  hs:0,
+  hints:()=>{
+   if(lvIdx===0){
+    return[
+     `To find f⁻¹(y), solve y = 2x + 3 for x: 2x = y − 3, so x = (y − 3)/2.`,
+     `Substitute y = ${y}: f⁻¹(${y}) = (${y} − 3) / 2.`,
+     `Compute ${y} − 3 first (${y-3}), then divide by 2.`
+    ];
+   }else if(lvIdx===1){
+    return[
+     `Use the inverse composition theorem: (f ∘ g)⁻¹ = g⁻¹ ∘ f⁻¹. The outside function inverse is applied FIRST.`,
+     `First evaluate f⁻¹(${y}) = (${y} − 3)/2 = ${fns[0].inv(y)}.`,
+     `Then substitute that result into g⁻¹: g⁻¹(${fns[0].inv(y)}) = ${fns[0].inv(y)} + 1.`
+    ];
+   }else{
+    return[
+     `Use the chained inverse theorem: (f ∘ g ∘ h)⁻¹ = h⁻¹ ∘ g⁻¹ ∘ f⁻¹. The order is completely reversed!`,
+     `First calculate f⁻¹(${y}) = (${y} − 1)/2 = 7. Then evaluate g⁻¹(7) = 7 − 3 = 4.`,
+     `Finally substitute 4 into h⁻¹(4) = (4 + 2)/3.`
+    ];
+   }
+  }
+ };
+}
 
 /* ===== audio ===== */
 let AC,MG,MU,mute=false,vm=.7,vu=.5;
@@ -49,6 +196,9 @@ const SFX={
  door:()=>{nz(1.4,.45,320);tone(78,1.4,'sawtooth',.12,0,45)},
  win:()=>[523,659,784,1047,1319,1568].forEach((f,i)=>tone(f,1.2,'triangle',.2,i*.15)),
  chest:()=>{nz(.65,.35,850);tone(190,.85,'sawtooth',.1,0,390)},
+ guardianAlert:()=>{tone(220,.35,'sawtooth',.18);tone(330,.45,'sawtooth',.15,.08)},
+ guardianDefeat:()=>[440,554,659,880].forEach((f,i)=>tone(f,.45,'triangle',.18,i*.09)),
+ damage:()=>{nz(.28,.4,180);tone(110,.25,'sawtooth',.2,0,60)},
  nearChime0:()=>{tone(659,.35,'sine',.06);tone(988,.45,'sine',.05,.08);tone(1318,.55,'sine',.04,.16)},
  nearChime1:()=>{tone(587,.5,'triangle',.05);tone(880,.6,'triangle',.04,.1);tone(1175,.7,'sine',.03,.2)},
  nearChime2:()=>{tone(440,.7,'sine',.07);tone(554,.8,'sine',.06,.12);tone(659,1.0,'sine',.05,.25)}
@@ -59,10 +209,79 @@ setInterval(()=>{if(!AC||mute)return;const l=G.on?G.lv:0,sc=[[220,247,277,330,37
  if(G.on&&Math.random()<.3){if(l==0)tone(RI(2000,3000),.12,'sine',.03,0,RI(1500,2400));else if(l==1)tone(1200,.15,'sine',.05,0,600);else nz(2,.05,200)}},900);
 
 /* ===== state / ui ===== */
-let G={on:false,lv:0,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,cine:0};
+let G={on:false,lv:0,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,cine:0,ct:0,keyGranted:false,advancing:false,lives:3,levelTimer:600,levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}};
 let ST='menu',SB='menu',K={},W=null,COL=[],IT=[],ANI=[],yaw=0,pitch=.35,drag=false,lockT=0;
 let DOOR=null,GC=null,CHEST=null,PG=null,ORB=null,RELIC=null,GATE_T=0;
 const P={x:0,y:0,z:24,vx:0,vz:0,vy:0,g:true,face:Math.PI,sp:0,st:0,act:0};
+
+function updateHeartsHUD(){
+ const e=$('hud-hearts');if(!e)return;
+ const h=[];
+ for(let i=0;i<3;i++){
+  const active=i<G.lives;
+  h.push(`<span class="heart-icon ${active?'':'lost'}">${active?'❤️':'🖤'}</span>`);
+ }
+ e.innerHTML=h.join('');
+}
+
+function flashRed(){
+ const f=$('flash');if(!f)return;
+ f.style.background='#ff3333';
+ f.style.transition='none';
+ f.style.opacity=.65;
+ requestAnimationFrame(()=>{
+  f.style.transition='opacity .6s';
+  f.style.opacity=0;
+  setTimeout(()=>{f.style.background='#fff3c0'},600);
+ });
+}
+
+function deductLife(reason='Incorrect calculation'){
+ if(G.lives<=0)return;
+ G.lives--;
+ updateHeartsHUD();
+ sfx('damage');
+ flashRed();
+ if(G.lives<=0){
+  gameOver(reason);
+ }else{
+  toast(`Lost 1 Life! (${G.lives}/3 remaining)`,'warn');
+ }
+}
+
+function gameOver(reason){
+ G.on=false;
+ ST='game-over';
+ if(document.pointerLockElement)document.exitPointerLock();
+ $('go-reason').textContent=reason||'Your vitality was depleted from ancient cipher hazards.';
+ const qDone=QD[G.lv].filter(([k])=>G.q[k]).length;
+ $('go-stats').innerHTML=
+  `<b>Level:</b> Level ${G.lv+1} — ${LV[G.lv].n}<br>`+
+  `<b>Objectives Completed:</b> ${qDone} / 8<br>`+
+  `<b>Level Time Elapsed:</b> ${formatTime(G.levelTimerElapsed)}<br>`+
+  `<b>Hint Uses:</b> ${SV.run.h}`;
+ sfx('locked');
+ ui('game-over');
+}
+
+function retryCheckpoint(){
+ G.lives=3;
+ updateHeartsHUD();
+ G.levelTimer=LV_TIMES[G.lv];
+ G.chestTimer=180;
+ G.inChestChallenge=false;
+ G.busy=false;
+ G.on=true;
+ P.x=G.cp.x;P.z=G.cp.z;P.y=0;P.vx=P.vz=P.vy=0;
+ yaw=G.cp.yaw;
+ ui(null);
+ try{cv.requestPointerLock()}catch(e){}
+ toast('Respawned at checkpoint with 3 lives. Continue your quest!','ok');
+}
+
+function updateCheckpoint(x,z,y=0){
+ G.cp={x,z,yaw:y};
+}
 
 function ui(id){
  ST=id||'play';K={};
@@ -118,7 +337,7 @@ function items(){
   }
   [...G.insc].forEach(i=>{
    const f=LV[G.lv].fs[i];
-   a.push({n:'Inscription: '+f.n+'(x)',d:`${f.txt}. Evaluate this function whenever it is the innermost step of a composition — the inside function is always applied first.`});
+   a.push({n:'Inscription: '+f.n+'(x)',d:`${f.txt}. Inverse: ${f.invTxt}.`});
   });
  }
  SV.frags.forEach(i=>a.push({n:'Treasure Fragment '+['I','II','III'][i],d:['A moss-green shard of the map, found beyond the Forest Door.','A glowing blue shard of the map, pulled from the Crystal Cavern.','The final shard.'][i]}));
@@ -135,9 +354,17 @@ function hudUpd(){
  if(!G.on)return;
  const L=LV[G.lv],o=QD[G.lv].find(([k])=>!G.q[k]);
  const chOk=G.chestState==='opened',kyOk=!!(G.hasKey&&G.keys[G.lv]),drOk=G.doorState==='unlocked';
+ updateHeartsHUD();
+ const ht=$('hud-timer');
+ if(ht){
+  ht.textContent='⏱️ '+formatTime(G.levelTimer);
+  ht.classList.toggle('urgent',G.levelTimer<60);
+ }
  $('obj').innerHTML=
   `<b>Level ${G.lv+1} — ${L.n}</b><br>${o?'Objective: '+o[1]:'All objectives complete'}`+
   `<div class="st-row">`+
+  `<span class="pill ${G.altarSolved?'ok':'lk'}">Altar: ${G.altarSolved?'Deciphered':'Sealed'}</span>`+
+  `<span class="pill ${G.guardianDefeated?'ok':'lk'}">Guardian: ${G.guardianDefeated?'Defeated':'Active'}</span>`+
   `<span class="pill ${chOk?'ok':'lk'}">Chest: ${chOk?'Opened':'Locked'}</span>`+
   `<span class="pill ${kyOk?'ok':'lk'}">Key: ${kyOk?'1/1':'0/1'}</span>`+
   `<span class="pill ${drOk?'ok':'lk'}">Door: ${drOk?'Open':'Locked'}</span>`+
@@ -174,8 +401,11 @@ const ACT={
  pause(){pause()},
  resume(){resume()},
  restart(){startLevel(G.lv)},
+ retry(){retryCheckpoint()},
  replay(){SV.run={t:0,h:0};SV.frags=[];startLevel(0)},
- claim(){claimTreasure()}
+ claim(){claimTreasure()},
+ claimAltar(){claimAltar()},
+ claimGuardian(){claimGuardian()}
 };
 document.addEventListener('click',e=>{
  const b=e.target.closest('[data-a]');if(!b)return;au();
@@ -192,27 +422,43 @@ $('mu').onchange=e=>{mute=e.target.checked;vol()};
 
 /* ===== puzzle ui ===== */
 function openPuz(kind){
- const L=LV[G.lv];G.pzs=G.pzs||{};let pz=G.pzs[kind];
- if(!pz){
-  pz=G.pzs[kind]=mkPuz(L.fs,L.x);
-  pz.kind=kind;
-  pz.title=['Wooden Chest Lock — Level 1','Crystal Chest Lock — Level 2','Vault Chest Lock — Level 3'][G.lv];
-  pz.fl=[
-   'Solve the 1-function formula to unlock the wooden chest and claim the Forest Key.',
-   'Compose the two functions from the inside out to unlock the chest and claim the Crystal Key.',
-   'Compose all three functions from innermost to outermost to unlock the chest and claim the Vault Key.'
-  ][G.lv];
+ const L=LV[G.lv];G.pzs=G.pzs||{};
+ let pz;
+ if(kind==='altar'){
+  pz=G.pzs.altar=mkCompPuz(G.lv);
+ }else if(kind==='guardian'){
+  pz=G.pzs.guardian=mkGuardianPuz(G.lv);
+ }else{
+  pz=G.pzs.chest=mkInversePuz(G.lv);
+  G.inChestChallenge=true;
+  G.chestTimer=180;
  }
- G.pz=pz;G.busy=false;ui('puz');drawPuz();setTimeout(()=>$('ans').focus(),50);
+ G.pz=pz;G.busy=false;ui('puz');drawPuz();setTimeout(()=>$('ans')&&$('ans').focus(),50);
 }
 
 function drawPuz(msg,cls){
  const pz=G.pz,compCount=pz.fns.length;
+ let timerHtml='';
+ if(pz.kind==='chest'){
+  timerHtml=`<div class="pz-chest-timer ${G.chestTimer<30?'urgent':''}" id="pz-timer">⏳ ${formatTime(G.chestTimer)}</div>`;
+ }
+ let guardianHtml='';
+ if(pz.kind==='guardian'&&pz.lore){
+  guardianHtml=`<div class="pz-guardian-box"><div class="pz-guardian-name">⚔️ ${pz.title}</div><p class="pz-guardian-speech">${pz.lore}</p></div>`;
+ }
+ let fnsHtml='';
+ if(pz.type==='inverse'){
+  fnsHtml=`<div style="margin:6px 0">${pz.fns.map(f=>`<div class="fn">${f.txt} &nbsp;➜&nbsp; <b style="color:#a2ff9b">${f.invTxt}</b></div>`).join('')}</div>`;
+ }else{
+  fnsHtml=`<div style="margin:6px 0">${pz.fns.map(f=>`<div class="fn">${f.txt}</div>`).join('')}</div>`;
+ }
  $('pz').innerHTML=
   `<div class="pz-head"><h2>${pz.title}</h2><span class="pz-tag">${compCount} Function${compCount>1?'s':''}</span></div>`+
+  timerHtml+
+  guardianHtml+
   `<p class="hh">${pz.fl}</p>`+
-  `${pz.fns.map(f=>`<div class="fn">${f.txt}</div>`).join('')}`+
-  `<p>Given input: <b>x = ${pz.x}</b></p>`+
+  fnsHtml+
+  `<p>Given input: <b>${pz.type==='inverse'?'y':'x'} = ${pz.x}</b></p>`+
   `<div class="nt">${pz.nt}</div>`+
   `<div style="text-align:center"><input type="text" id="ans" inputmode="numeric" placeholder="answer" autocomplete="off"><br>`+
   `<button id="sb">Submit</button><button id="hb" ${pz.hs>=3?'disabled':''}>Hint (${pz.hs}/3)</button><button id="cb">Close</button></div>`+
@@ -220,7 +466,10 @@ function drawPuz(msg,cls){
   `${pz.hints().slice(0,pz.hs).map((h,i)=>`<div class="hh">Hint ${i+1}: ${h}</div>`).join('')}`;
  $('sb').onclick=submit;
  $('hb').onclick=()=>{if(pz.hs<3){pz.hs++;SV.run.h++;drawPuz()}};
- $('cb').onclick=()=>{ui(null);try{cv.requestPointerLock()}catch(e){}};
+ $('cb').onclick=()=>{
+  if(pz.kind==='chest'){G.inChestChallenge=false}
+  ui(null);try{cv.requestPointerLock()}catch(e){}
+ };
  $('ans').onkeydown=e=>{if(e.key==='Enter')submit();if(e.key!=='Escape')e.stopPropagation()};
 }
 
@@ -233,17 +482,42 @@ function submit(){
   setTimeout(()=>$('ans')&&$('ans').focus(),20);return;
  }
  if(+s!==pz.ans){
-  sfx('bad');drawPuz('Incorrect answer! Remember: evaluate the innermost function first, then work outward.','no');
+  deductLife(pz.kind==='chest'?'Incorrect inverse chest key calculation':(pz.kind==='guardian'?'Guardian struck with warding burst':'Incorrect cipher attempt at Altar'));
+  if(G.lives<=0)return;
+  drawPuz('Incorrect answer! Check your calculations and try again. (-1 Life)','no');
   const p=$('pz');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');
   setTimeout(()=>$('ans')&&$('ans').focus(),20);return;
  }
  G.busy=true;sfx('ok');flash();
- $('msg').className='ok';$('msg').textContent='Correct! Membuka Solution Walkthrough…';
- setTimeout(()=>{
-  ui('sol');
-  renderSolutionWalkthrough(pz);
-  G.busy=false;
- },600);
+ if(pz.kind==='altar'){
+  G.altarSolved=true;
+  q('comp');
+  q('reveal');
+  $('msg').className='ok';$('msg').textContent='Correct! Cipher Decrypted. Coordinates Revealed…';
+  setTimeout(()=>{
+   ui('sol');
+   renderSolutionWalkthrough(pz);
+   G.busy=false;
+  },600);
+ }else if(pz.kind==='guardian'){
+  G.guardianDefeated=true;
+  q('guardian');
+  $('msg').className='ok';$('msg').textContent='Correct! Guardian Deactivated. Path Opened…';
+  setTimeout(()=>{
+   ui('sol');
+   renderSolutionWalkthrough(pz);
+   G.busy=false;
+  },600);
+ }else{
+  G.inChestChallenge=false;
+  q('inverse');
+  $('msg').className='ok';$('msg').textContent='Correct! Lock Decrypted. Solution Walkthrough Loading…';
+  setTimeout(()=>{
+   ui('sol');
+   renderSolutionWalkthrough(pz);
+   G.busy=false;
+  },600);
+ }
 }
 
 function claimTreasure(){
@@ -252,87 +526,154 @@ function claimTreasure(){
  beginChestOpen();
 }
 
+function claimAltar(){
+ ui(null);
+ try{cv.requestPointerLock()}catch(e){}
+ sfx('ok');
+ if(G.altarLight)G.altarLight.intensity=2.8;
+ toast('Coordinates Decrypted! Follow the pathway toward the Guardian.','ok');
+ if(G.altarPos)updateCheckpoint(G.altarPos[0],G.altarPos[1],0);
+ hudUpd();
+}
+
+function claimGuardian(){
+ ui(null);
+ try{cv.requestPointerLock()}catch(e){}
+ sfx('guardianDefeat');
+ if(G.guardian){
+  if(G.guardian.col)G.guardian.col.off=true;
+  G.guardian.defeated=true;
+ }
+ if(G.guardianIt)G.guardianIt.on=false;
+ toast('Guardian Deactivated! The Wooden Treasure Chest is accessible.','ok');
+ if(G.guardianPos)updateCheckpoint(G.guardianPos[0],G.guardianPos[1],0);
+ hudUpd();
+}
+
 function renderSolutionWalkthrough(pz){
  const lvIdx=G.lv,L=LV[lvIdx],count=pz.fns.length;
- let conceptTitle='',conceptDesc='';
- if(count===1){
-  conceptTitle='Konsep: Evaluasi Fungsi Tunggal';
-  conceptDesc='Pada fungsi tunggal <i>f(x)</i>, kita mencari nilai output dengan melakukan substitusi langsung nilai input <b>x</b> ke dalam rumus fungsi, lalu menghitung perkalian dan penjumlahan sesuai aturan aritmatika.';
- }else if(count===2){
-  conceptTitle='Konsep: Komposisi Dua Fungsi (f ∘ g)(x)';
-  conceptDesc='Komposisi fungsi <b>(f ∘ g)(x)</b> didefinisikan sebagai <b>f(g(x))</b>. Prinsip utama penyelesaiannya adalah <b>Inside-Out</b> (dari dalam ke luar). Kita harus mencari nilai fungsi terdalam <i>g(x)</i> terlebih dahulu, lalu nilai hasilnya dimasukkan sebagai input (argumen) untuk fungsi terluar <i>f(x)</i>.';
- }else{
-  conceptTitle='Konsep: Komposisi Tiga Fungsi (f ∘ g ∘ h)(x)';
-  conceptDesc='Komposisi tiga fungsi <b>(f ∘ g ∘ h)(x)</b> bermakna <b>f(g(h(x)))</b>. Pengerjaan dilakukan bertahap secara berantai dari lapisan terdalam ke terluar: hitung <i>h(x)</i> terlebih dahulu, substitusikan hasilnya ke <i>g(x)</i>, dan terakhir masukkan ke <i>f(x)</i>.';
- }
+ let subtitle='',conceptTitle='',conceptDesc='',actionLabel='',actionAttr='';
+ const steps=[];
 
- const steps=[];let curVal=pz.x;
- for(let s=0;s<count;s++){
-  const fnIdx=count-1-s,fn=pz.fns[fnIdx],inVal=curVal,outVal=fn.ap(inVal);
-  curVal=outVal;
-  let stepLabel='',stepDesc='',mathLines=[];
+ if(pz.type==='inverse'){
+  subtitle=`SOLUTION WALKTHROUGH · INVERSE FUNCTION CIPHER · LEVEL ${lvIdx+1} (${L.n})`;
+  actionLabel='CLAIM YOUR TREASURE';
+  actionAttr='claim';
+
   if(count===1){
-   stepLabel=`Langkah 1: Substitusi x = ${inVal} ke ${fn.n}(x)`;
-   stepDesc=`Masukkan nilai x = ${inVal} ke dalam fungsi <b>${fn.txt}</b>. Hitung hasil perkalian terlebih dahulu, kemudian jumlahkan.`;
-   mathLines.push(`${fn.n}(${inVal}) = ${fn.sub(inVal)}`);
-   if(fn.a!==1)mathLines.push(`     = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
-   mathLines.push(`     = ${outVal}`);
+   conceptTitle='Konsep: Fungsi Invers Tunggal f⁻¹(x)';
+   conceptDesc='Fungsi invers f⁻¹(x) membalikkan pemetaan fungsi f(x). Jika fungsi f mengalikan x dengan 2 lalu menambahkan 3, maka rumus invers membalik operasi tersebut: kurangi dengan 3 terlebih dahulu, kemudian bagi hasilnya dengan 2. f⁻¹(x) = (x − 3) / 2.';
+   const fn=pz.fns[0];
+   const diff=pz.x-fn.b,ans=fn.inv(pz.x);
+   steps.push({
+    num:1,
+    label:`Langkah 1: Substitusi Nilai y = ${pz.x} ke Rumus Invers f⁻¹(x)`,
+    desc:`Masukkan nilai output y = ${pz.x} ke dalam rumus invers f⁻¹(x) = (x − 3) / 2. Lakukan pengurangan terlebih dahulu pada pembilang, kemudian bagi hasilnya dengan 2.`,
+    math:`f⁻¹(${pz.x}) = (${pz.x} − ${fn.b}) / ${fn.a}\n        = ${diff} / ${fn.a}\n        = ${ans}`
+   });
   }else if(count===2){
-   if(s===0){
-    stepLabel=`Langkah 1: Evaluasi Fungsi Terdalam ${fn.n}(${inVal})`;
-    stepDesc=`Selesaikan fungsi yang berada di bagian terdalam, yaitu <b>${fn.n}(x)</b>, dengan mensubstitusikan nilai input x = ${inVal}.`;
-    mathLines.push(`${fn.n}(${inVal}) = ${fn.sub(inVal)}`);
-    if(fn.a!==1)mathLines.push(`     = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
-    mathLines.push(`     = ${outVal}`);
-   }else{
-    const innerFn=pz.fns[count-1];
-    stepLabel=`Langkah 2: Substitusi Hasil ${innerFn.n}(${pz.x}) ke Fungsi Terluar ${fn.n}(x)`;
-    stepDesc=`Gunakan hasil dari langkah 1 (<b>${innerFn.n}(${pz.x}) = ${inVal}</b>) sebagai input baru untuk fungsi terluar <b>${fn.txt}</b>.`;
-    mathLines.push(`f(g(${pz.x})) = ${fn.n}(${inVal})`);
-    mathLines.push(`        = ${fn.sub(inVal)}`);
-    if(fn.a!==1)mathLines.push(`        = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
-    mathLines.push(`        = ${outVal}`);
-   }
+   conceptTitle='Konsep: Invers Komposisi Dua Fungsi (f ∘ g)⁻¹';
+   conceptDesc='Berdasarkan Teorema Invers Komposisi: <b>(f ∘ g)⁻¹ = g⁻¹ ∘ f⁻¹</b>. Urutan pengerjaan DIBALIK! Evaluasi fungsi invers terluar f⁻¹(x) terlebih dahulu, lalu nilai hasilnya disubstitusikan ke dalam fungsi invers terdalam g⁻¹(x).';
+   const f=pz.fns[0],g=pz.fns[1];
+   const fInvVal=f.inv(pz.x);
+   steps.push({
+    num:1,
+    label:`Langkah 1: Evaluasi Invers Fungsi Terluar f⁻¹(${pz.x})`,
+    desc:`Gunakan rumus invers f⁻¹(x) = (x − 3) / 2 dengan memasukkan x = ${pz.x}.`,
+    math:`f⁻¹(${pz.x}) = (${pz.x} − 3) / 2\n        = ${pz.x - 3} / 2\n        = ${fInvVal}`
+   });
+   const finalVal=g.inv(fInvVal);
+   steps.push({
+    num:2,
+    label:`Langkah 2: Substitusi Hasil f⁻¹(${pz.x}) = ${fInvVal} ke g⁻¹(x)`,
+    desc:`Gunakan hasil ${fInvVal} sebagai input untuk fungsi invers g⁻¹(x) = x + 1.`,
+    math:`(f ∘ g)⁻¹(${pz.x}) = g⁻¹(f⁻¹(${pz.x}))\n              = g⁻¹(${fInvVal})\n              = ${fInvVal} + 1\n              = ${finalVal}`
+   });
   }else{
-   if(s===0){
-    stepLabel=`Langkah 1: Evaluasi Lapisan Terdalam ${fn.n}(${inVal})`;
-    stepDesc=`Mulai dari fungsi paling dalam <b>${fn.txt}</b> dengan mensubstitusikan nilai x = ${inVal}.`;
-    mathLines.push(`${fn.n}(${inVal}) = ${fn.sub(inVal)}`);
-    if(fn.a!==1)mathLines.push(`     = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
-    mathLines.push(`     = ${outVal}`);
-   }else if(s===1){
-    const innerFn=pz.fns[2];
-    stepLabel=`Langkah 2: Substitusi ke Lapisan Tengah ${fn.n}(x)`;
-    stepDesc=`Masukkan hasil dari lapisan terdalam (<b>${innerFn.n}(${pz.x}) = ${inVal}</b>) ke dalam fungsi perantara <b>${fn.txt}</b>.`;
-    mathLines.push(`g(h(${pz.x})) = ${fn.n}(${inVal})`);
-    mathLines.push(`        = ${fn.sub(inVal)}`);
-    if(fn.a!==1)mathLines.push(`        = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
-    mathLines.push(`        = ${outVal}`);
-   }else{
-    const midExpr=`g(h(${pz.x}))`;
-    stepLabel=`Langkah 3: Substitusi ke Lapisan Terluar ${fn.n}(x)`;
-    stepDesc=`Gunakan hasil dari komposisi perantara (<b>${midExpr} = ${inVal}</b>) sebagai argumen untuk fungsi terluar <b>${fn.txt}</b>.`;
-    mathLines.push(`f(g(h(${pz.x}))) = ${fn.n}(${inVal})`);
-    mathLines.push(`           = ${fn.sub(inVal)}`);
-    if(fn.a!==1)mathLines.push(`           = ${fn.a*inVal} ${fn.b<0?'− '+(-fn.b):'+ '+fn.b}`);
-    mathLines.push(`           = ${outVal}`);
-   }
+   conceptTitle='Konsep: Invers Komposisi Tiga Fungsi (f ∘ g ∘ h)⁻¹';
+   conceptDesc='Pada komposisi berantai tiga fungsi, invers membalik urutan secara menyeluruh: <b>(f ∘ g ∘ h)⁻¹ = h⁻¹ ∘ g⁻¹ ∘ f⁻¹</b>. Evaluasi dilakukan secara berantai dari f⁻¹, dilanjutkan ke g⁻¹, dan terakhir ke h⁻¹.';
+   const f=pz.fns[0],g=pz.fns[1],h=pz.fns[2];
+   const fVal=f.inv(pz.x);
+   steps.push({
+    num:1,
+    label:`Langkah 1: Evaluasi Lapisan Terluar f⁻¹(${pz.x})`,
+    desc:`Substitusikan input ${pz.x} ke dalam rumus f⁻¹(x) = (x − 1) / 2.`,
+    math:`f⁻¹(${pz.x}) = (${pz.x} − 1) / 2\n        = ${pz.x - 1} / 2\n        = ${fVal}`
+   });
+   const gVal=g.inv(fVal);
+   steps.push({
+    num:2,
+    label:`Langkah 2: Substitusi Hasil ${fVal} ke g⁻¹(x)`,
+    desc:`Masukkan hasil ${fVal} ke dalam rumus perantara g⁻¹(x) = x − 3.`,
+    math:`g⁻¹(f⁻¹(${pz.x})) = g⁻¹(${fVal})\n              = ${fVal} − 3\n              = ${gVal}`
+   });
+   const hVal=h.inv(gVal);
+   steps.push({
+    num:3,
+    label:`Langkah 3: Substitusi Hasil ${gVal} ke Lapisan Terdalam h⁻¹(x)`,
+    desc:`Masukkan hasil ${gVal} ke dalam rumus h⁻¹(x) = (x + 2) / 3.`,
+    math:`(f ∘ g ∘ h)⁻¹(${pz.x}) = h⁻¹(g⁻¹(f⁻¹(${pz.x})))\n                  = h⁻¹(${gVal})\n                  = (${gVal} + 2) / 3\n                  = ${gVal + 2} / 3\n                  = ${hVal}`
+   });
   }
-  steps.push({num:s+1,label:stepLabel,desc:stepDesc,math:mathLines.join('\n')});
+ }else if(pz.type==='guardian'){
+  subtitle=`GUARDIAN’S TRIAL PASSED · LEVEL ${lvIdx+1} (${L.n})`;
+  actionLabel='APPROACH TREASURE CHEST';
+  actionAttr='claimGuardian';
+  conceptTitle='Uji Kelayakan Penjaga: Evaluasi Komposisi Fungsi';
+  conceptDesc='Penjaga menguji penguasaan konsep komposisi fungsi dan ketelitian substitusi numerik. Evaluasi dilakukan dari dalam ke luar untuk memperoleh nilai akhir.';
+  let curVal=pz.x;
+  for(let s=0;s<count;s++){
+   const fnIdx=count-1-s,fn=pz.fns[fnIdx],inVal=curVal,outVal=fn.ap(inVal);
+   curVal=outVal;
+   steps.push({
+    num:s+1,
+    label:`Langkah ${s+1}: Evaluasi ${fn.n}(${inVal})`,
+    desc:`Substitusi x = ${inVal} ke dalam persamaan ${fn.txt}.`,
+    math:`${fn.n}(${inVal}) = ${fn.sub(inVal)}\n     = ${outVal}`
+   });
+  }
+ }else{
+  // Altar composition
+  subtitle=`CIPHER DECRYPTED · LEVEL ${lvIdx+1} (${L.n})`;
+  actionLabel='TRAVEL TO TREASURE AREA';
+  actionAttr='claimAltar';
+  if(count===1){
+   conceptTitle='Konsep: Evaluasi Fungsi Tunggal';
+   conceptDesc='Pada fungsi tunggal <i>f(x)</i>, kita mencari nilai output dengan melakukan substitusi langsung nilai input <b>x</b> ke dalam rumus fungsi, lalu menghitung perkalian dan penjumlahan sesuai aturan aritmatika.';
+  }else if(count===2){
+   conceptTitle='Konsep: Komposisi Dua Fungsi (f ∘ g)(x)';
+   conceptDesc='Komposisi fungsi <b>(f ∘ g)(x)</b> didefinisikan sebagai <b>f(g(x))</b>. Prinsip utama penyelesaiannya adalah <b>Inside-Out</b> (dari dalam ke luar). Kita harus mencari nilai fungsi terdalam <i>g(x)</i> terlebih dahulu, lalu nilai hasilnya dimasukkan sebagai input (argumen) untuk fungsi terluar <i>f(x)</i>.';
+  }else{
+   conceptTitle='Konsep: Komposisi Tiga Fungsi (f ∘ g ∘ h)(x)';
+   conceptDesc='Komposisi tiga fungsi <b>(f ∘ g ∘ h)(x)</b> bermakna <b>f(g(h(x)))</b>. Pengerjaan dilakukan bertahap secara berantai dari lapisan terdalam ke terluar: hitung <i>h(x)</i> terlebih dahulu, substitusikan hasilnya ke <i>g(x)</i>, dan terakhir masukkan ke <i>f(x)</i>.';
+  }
+  let curVal=pz.x;
+  for(let s=0;s<count;s++){
+   const fnIdx=count-1-s,fn=pz.fns[fnIdx],inVal=curVal,outVal=fn.ap(inVal);
+   curVal=outVal;
+   steps.push({
+    num:s+1,
+    label:`Langkah ${s+1}: Evaluasi ${fn.n}(${inVal})`,
+    desc:`Substitusikan nilai input ke dalam fungsi ${fn.txt}.`,
+    math:`${fn.n}(${inVal}) = ${fn.sub(inVal)}\n     = ${outVal}`
+   });
+  }
  }
 
- const finalExpr=count===1?`f(${pz.x}) = ${pz.ans}`:`${pz.nt.split('=')[0].trim()} = ${pz.nest} = ${pz.ans}`;
+ const fnsGrid=pz.type==='inverse'
+  ? pz.fns.map(f=>`<span class="sol-fn-badge">${f.txt} &nbsp;➜&nbsp; <b style="color:#a2ff9b">${f.invTxt}</b></span>`).join('')
+  : pz.fns.map(f=>`<span class="sol-fn-badge">${f.txt}</span>`).join('');
 
  $('sol-box').innerHTML=
   `<div class="sol-header">`+
    `<span class="sol-tag">Jawaban Terverifikasi Benar</span>`+
    `<h2 class="sol-title">CORRECT ANSWER!</h2>`+
-   `<p class="sol-subtitle">SOLUTION WALKTHROUGH · LEVEL ${lvIdx+1} (${L.n})</p>`+
+   `<p class="sol-subtitle">${subtitle}</p>`+
   `</div>`+
   `<div class="sol-card">`+
-   `<div class="sol-card-title"><span>📐</span> SOAL & FUNGSI YANG DIKETAHUI</div>`+
-   `<div class="sol-card-text">Evaluasi nilai: <b style="color:#ffe9a8">${pz.nt}</b> dengan input <b>x = ${pz.x}</b></div>`+
-   `<div class="sol-fns-grid">${pz.fns.map(f=>`<span class="sol-fn-badge">${f.txt}</span>`).join('')}</div>`+
+   `<div class="sol-card-title"><span>📐</span> SOAL & RUMUS MATEMATIKA</div>`+
+   `<div class="sol-card-text">Soal: <b style="color:#ffe9a8">${pz.nt}</b> &nbsp;|&nbsp; Input: <b>${pz.type==='inverse'?'y':'x'} = ${pz.x}</b></div>`+
+   `<div class="sol-fns-grid">${fnsGrid}</div>`+
   `</div>`+
   `<div class="sol-card">`+
    `<div class="sol-card-title"><span>💡</span> ${conceptTitle}</div>`+
@@ -350,17 +691,23 @@ function renderSolutionWalkthrough(pz){
   `</div>`+
   `<div class="sol-result">`+
    `<div class="sol-res-label">Hasil Akhir Perhitungan</div>`+
-   `<div class="sol-res-val">${finalExpr}</div>`+
+   `<div class="sol-res-val">${pz.nt.split('=')[0].trim()} = ${pz.ans}</div>`+
   `</div>`+
   `<div class="sol-actions">`+
-   `<button class="btn-claim" id="btn-claim" data-a="claim">`+
+   `<button class="btn-claim" id="btn-claim" data-a="${actionAttr}">`+
     `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>`+
-    ` CLAIM YOUR TREASURE`+
+    ` ${actionLabel}`+
    `</button>`+
   `</div>`;
 
  const b=$('btn-claim');
- if(b)b.onclick=()=>claimTreasure();
+ if(b){
+  b.onclick=()=>{
+   if(actionAttr==='claimAltar')claimAltar();
+   else if(actionAttr==='claimGuardian')claimGuardian();
+   else claimTreasure();
+  };
+ }
  setTimeout(()=>{if($('btn-claim'))$('btn-claim').focus()},60);
 }
 
@@ -445,12 +792,14 @@ function buildKeyMesh(levelIdx){
 }
 
 function buildTreasureChest(x,z,levelIdx,yaw=0,camOff=null){
+ const sc=[0.58,0.46,0.38][levelIdx];
  const g=new THREE.Group();
  g.position.set(x,0,z);
  W.add(g);
 
  const boxGroup=new THREE.Group();
  boxGroup.rotation.y=yaw;
+ boxGroup.scale.set(sc,sc,sc);
  g.add(boxGroup);
 
  const woodTex=mkWoodTex('#7c4823','#48260e','#613617');
@@ -470,10 +819,10 @@ function buildTreasureChest(x,z,levelIdx,yaw=0,camOff=null){
  };
 
  // low stone dais underneath chest
- addPart(new THREE.BoxGeometry(3.2,.18,2.3),M([0x667060,0x344664,0x736348][levelIdx]),0,.09,0);
+ addPart(new THREE.BoxGeometry(2.6,.14,1.7),M([0x667060,0x344664,0x736348][levelIdx]),0,.07,0);
 
- // hollow chest base (y from 0.18 to 1.14)
- const by=.18;
+ // hollow chest base (y from 0.14 to 1.02)
+ const by=.14;
  addPart(new THREE.BoxGeometry(2.4,.14,1.5),darkWoodMat,0,by+.07,0); // floor
  addPart(new THREE.BoxGeometry(2.0,.08,1.18),velvetMat,0,by+.16,0); // inner velvet lining
  addPart(new THREE.BoxGeometry(.18,.88,1.5),woodMat,-1.11,by+.52,0); // left wall
@@ -537,16 +886,16 @@ function buildTreasureChest(x,z,levelIdx,yaw=0,camOff=null){
  addPart(new THREE.CylinderGeometry(.032,.032,.04,8),ironMat,0,-.02,.065,padlock,Math.PI/2,0,0); // keyhole top
  addPart(new THREE.BoxGeometry(.026,.09,.04),ironMat,0,-.08,.065,padlock); // keyhole slot
 
- // glowing lock status light & interior treasure glow light
- const lockGlow=new THREE.PointLight(0xffaa33,.9,9);
- lockGlow.position.set(0,by+1.1,1.35);boxGroup.add(lockGlow);
- const innerGlow=new THREE.PointLight(LV[levelIdx].kc,0,10);
- innerGlow.position.set(0,by+.8,0);boxGroup.add(innerGlow);
+ // subtle glowing lock status light & interior treasure glow light (non-intrusive)
+ const lockGlow=new THREE.PointLight(0xffaa33,.45,4.0);
+ lockGlow.position.set(0,by+1.0,1.2);boxGroup.add(lockGlow);
+ const innerGlow=new THREE.PointLight(LV[levelIdx].kc,0,5.0);
+ innerGlow.position.set(0,by+.75,0);boxGroup.add(innerGlow);
 
  // 3D Key nested inside chest (initially hidden until chest opens)
  const keyMesh=buildKeyMesh(levelIdx);
- keyMesh.position.set(0,by+.42,0);
- keyMesh.scale.setScalar(.85);
+ keyMesh.position.set(0,(by+.38)*sc,0);
+ keyMesh.scale.setScalar(.85*sc);
  keyMesh.visible=false;
  g.add(keyMesh);
 
@@ -554,14 +903,15 @@ function buildTreasureChest(x,z,levelIdx,yaw=0,camOff=null){
  const spN=24,spGeo=new THREE.BufferGeometry(),spPos=new Float32Array(spN*3);
  for(let i=0;i<spN;i++){spPos[i*3]=(Math.random()-.5)*1.4;spPos[i*3+1]=by+.3+Math.random()*.5;spPos[i*3+2]=(Math.random()-.5)*.9}
  spGeo.setAttribute('position',new THREE.BufferAttribute(spPos,3));
- const spMat=new THREE.PointsMaterial({color:LV[levelIdx].kc,size:.22,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+ const spMat=new THREE.PointsMaterial({color:LV[levelIdx].kc,size:.18*sc,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
  const sparks=new THREE.Points(spGeo,spMat);boxGroup.add(sparks);
 
- // solid collision box matching chest footprint
+ // solid collision box accurately matching scaled chest footprint
  const isTurned=Math.abs(Math.sin(yaw))>0.5;
- box(x,z,isTurned?1.05:1.45,isTurned?1.45:1.05,2.4);
+ const hx=(isTurned?0.95:1.35)*sc, hz=(isTurned?1.35:0.95)*sc;
+ box(x,z,hx,hz,1.9*sc);
 
- return{group:g,boxGroup,x,z,yaw,camOff,lid,padlock,shackle,lockBody,lockGlow,innerGlow,keyMesh,sparks,spMat,spPos,spN,by};
+ return{group:g,boxGroup,x,z,yaw,camOff,lid,padlock,shackle,lockBody,lockGlow,innerGlow,keyMesh,sparks,spMat,spPos,spN,by,sc};
 }
 
 function buildExitDoor(levelIdx){
@@ -609,10 +959,303 @@ function buildExitDoor(levelIdx){
  DOOR={group:g,leftDoor,rightDoor,lockEmblem,sigilMat,sigilCore,sigilLight,shake:0};
 }
 
+const ALTAR_POS=[[-12,8],[0,10],[0,10]],GUARD_POS=[[15.0,-1.0],[14.2,5.0],[-17.0,10.0]];
+
+function buildCipherAltar(levelIdx){
+ const g=new THREE.Group();
+ const [ax,az]=ALTAR_POS[levelIdx];
+ g.position.set(ax,0,az);
+ W.add(g);
+
+ const baseMat=M([0x5e6858,0x2b3850,0x5a4832][levelIdx],{roughness:.8});
+ const goldMat=M([0x9fa875,0x44c4ff,0xd4a537][levelIdx],{metalness:.85,roughness:.2,emissive:[0x223311,0x0a2a44,0x443311][levelIdx]});
+ const runeColor=[0x70ff88,0x44d4ff,0xffbb33][levelIdx];
+ const runeMat=new THREE.MeshStandardMaterial({color:runeColor,emissive:runeColor,emissiveIntensity:1.2,metalness:.4,roughness:.2});
+
+ const add=(geo,mat,px,py,pz,rx=0,ry=0,rz=0)=>{
+  const m=new THREE.Mesh(geo,mat);
+  m.position.set(px,py,pz);m.rotation.set(rx,ry,rz);
+  m.castShadow=true;m.receiveShadow=true;
+  g.add(m);return m;
+ };
+
+ // Octagonal tiered stone dais
+ add(new THREE.CylinderGeometry(2.4,2.7,.35,8),baseMat,0,.175,0);
+ add(new THREE.CylinderGeometry(1.9,2.2,.35,8),baseMat,0,.45,0);
+ add(new THREE.CylinderGeometry(1.4,1.7,.3,8),baseMat,0,.75,0);
+
+ // Central carved cipher pillar
+ add(new THREE.CylinderGeometry(.55,.65,1.3,8),baseMat,0,1.55,0);
+ add(new THREE.CylinderGeometry(.7,.55,.25,8),goldMat,0,2.3,0);
+
+ // Rotating glyph ring floating around pillar
+ const ring=add(new THREE.TorusGeometry(.95,.08,8,24),goldMat,0,1.8,0,Math.PI/2,0,0);
+
+ // Floating rotating polyhedron cipher core
+ const polyGeo=[new THREE.OctahedronGeometry(.42,0),new THREE.IcosahedronGeometry(.42,0),new THREE.DodecahedronGeometry(.42,0)][levelIdx];
+ const poly=add(polyGeo,runeMat,0,2.75,0);
+
+ // 4 perimeter focus rune obelisks on dais corners
+ const obeliskMat=M([0x525c4d,0x222e44,0x4c3c28][levelIdx]);
+ for(let k=0;k<4;k++){
+  const a=k*Math.PI/2+Math.PI/4;
+  const ox=Math.cos(a)*1.6,oz=Math.sin(a)*1.6;
+  add(new THREE.BoxGeometry(.32,.9,.32),obeliskMat,ox,.85,oz);
+  const gem=add(new THREE.OctahedronGeometry(.12,0),runeMat,ox,1.4,oz);
+  ANI.push((t)=>{gem.rotation.y=t*1.5;gem.position.y=1.4+Math.sin(t*3+k)*.06});
+ }
+
+ const light=new THREE.PointLight(runeColor,1.4,10);
+ light.position.set(0,2.8,0);
+ g.add(light);
+
+ circ(ax,az,1.4,3.2);
+
+ ANI.push((t,dt)=>{
+  ring.rotation.z+=dt*.8;
+  poly.rotation.y+=dt*1.2;
+  poly.rotation.x=Math.sin(t*1.5)*.25;
+  poly.position.y=2.75+Math.sin(t*2.5)*.12;
+  if(G.altarSolved){
+   light.intensity=2.4+Math.sin(t*4)*.5;
+   poly.material.emissiveIntensity=1.8+Math.sin(t*4)*.4;
+  }
+ });
+
+ return{group:g,ring,poly,light,x:ax,z:az};
+}
+
+function buildGuardian(levelIdx){
+ const g=new THREE.Group();
+ const [gx,gz]=GUARD_POS[levelIdx];
+ g.position.set(gx,0,gz);
+ W.add(g);
+
+ const animParts=[];
+ let col,coreLight;
+
+ if(levelIdx===0){
+  // LEVEL 1: Ancient Forest Stone Guardian
+  g.rotation.y=-Math.PI*.65;
+  const rockMat=M(0x525c4e,{roughness:.9});
+  const darkRockMat=M(0x3a4237,{roughness:.95});
+  const runeMat=new THREE.MeshStandardMaterial({color:0x44ff88,emissive:0x33ee66,emissiveIntensity:1.5,roughness:.2});
+
+  const mk=(geo,mat,px,py,pz,rx=0,ry=0,rz=0,p=g)=>{
+   const m=new THREE.Mesh(geo,mat);
+   m.position.set(px,py,pz);m.rotation.set(rx,ry,rz);
+   m.castShadow=true;m.receiveShadow=true;
+   p.add(m);return m;
+  };
+
+  // Base stone pedestal
+  mk(new THREE.CylinderGeometry(1.3,1.6,.4,8),darkRockMat,0,.2,0);
+
+  // Guardian Torso (Massive boulder structure)
+  const torso=new THREE.Group();torso.position.set(0,1.8,0);g.add(torso);
+  mk(new THREE.DodecahedronGeometry(.95,0),rockMat,0,0,0,.3,.2,0,torso);
+  mk(new THREE.BoxGeometry(1.6,.45,.7),darkRockMat,0,.55,0,0,0,0,torso);
+
+  // Glowing rune chest core
+  mk(new THREE.OctahedronGeometry(.28,0),runeMat,0,0,.65,0,0,0,torso);
+
+  // Floating Head
+  const head=new THREE.Group();head.position.set(0,2.9,0);g.add(head);
+  mk(new THREE.BoxGeometry(.7,.8,.7),rockMat,0,0,0,0,0,0,head);
+  mk(new THREE.BoxGeometry(.18,.08,.1),runeMat,-.16,.1,.34,0,0,0,head);
+  mk(new THREE.BoxGeometry(.18,.08,.1),runeMat,.16,.1,.34,0,0,0,head);
+
+  // Heavy stone arms
+  const armL=mk(new THREE.BoxGeometry(.45,1.3,.45),rockMat,-1.05,1.4,.1);
+  const armR=mk(new THREE.BoxGeometry(.45,1.3,.45),rockMat,1.05,1.4,.1);
+
+  // Orbiting rune stones
+  const runes=[];
+  for(let k=0;k<3;k++){
+   runes.push(mk(new THREE.DodecahedronGeometry(.22,0),runeMat,0,0,0));
+  }
+
+  coreLight=new THREE.PointLight(0x44ff88,1.4,8);
+  coreLight.position.set(0,2.2,.8);
+  g.add(coreLight);
+
+  col=circ(gx,gz,1.6,5);
+
+  animParts.push((t,dt)=>{
+   if(G.guardianDefeated){
+    torso.position.y=Math.max(.7,torso.position.y-dt*.8);
+    head.position.y=Math.max(1.3,head.position.y-dt*.9);
+    coreLight.intensity=Math.max(0,coreLight.intensity-dt*2);
+    runeMat.emissiveIntensity=Math.max(.1,runeMat.emissiveIntensity-dt*2);
+    return;
+   }
+   torso.position.y=1.8+Math.sin(t*1.8)*.08;
+   head.position.y=2.9+Math.sin(t*2.2)*.06;
+   head.rotation.y=Math.sin(t*.9)*.2;
+   armL.rotation.x=Math.sin(t*1.5)*.15;
+   armR.rotation.x=-Math.sin(t*1.5)*.15;
+   for(let k=0;k<3;k++){
+    const a=t*1.8+k*(Math.PI*2/3);
+    runes[k].position.set(Math.cos(a)*1.7,2.0+Math.sin(t*2+k)*.35,Math.sin(a)*1.7);
+    runes[k].rotation.y=t*2;
+   }
+   coreLight.intensity=1.4+Math.sin(t*3)*.3;
+  });
+
+ }else if(levelIdx===1){
+  // LEVEL 2: Glowing Crystal Sentinel
+  g.rotation.y=-Math.PI*.5;
+  const crystalMat=M(0x39a7ff,{emissive:0x2288ff,emissiveIntensity:1.1,metalness:.6,roughness:.15});
+  const darkCrystalMat=M(0x192a54,{metalness:.8,roughness:.3});
+  const coreMat=new THREE.MeshStandardMaterial({color:0x9a5cff,emissive:0xaa44ff,emissiveIntensity:1.6,metalness:.4,roughness:.1});
+
+  const mk=(geo,mat,px,py,pz,rx=0,ry=0,rz=0,p=g)=>{
+   const m=new THREE.Mesh(geo,mat);
+   m.position.set(px,py,pz);m.rotation.set(rx,ry,rz);
+   m.castShadow=true;m.receiveShadow=true;
+   p.add(m);return m;
+  };
+
+  // Dais base
+  mk(new THREE.CylinderGeometry(1.2,1.5,.3,6),darkCrystalMat,0,.15,0);
+
+  // Floating crystalline spire body
+  const body=new THREE.Group();body.position.set(0,2.2,0);g.add(body);
+  mk(new THREE.ConeGeometry(.7,2.2,6),crystalMat,0,.4,0,0,0,0,body);
+  mk(new THREE.ConeGeometry(.65,1.6,6),crystalMat,0,-.6,0,Math.PI,0,0,body);
+
+  // Glowing heart core
+  const heart=mk(new THREE.OctahedronGeometry(.38,0),coreMat,0,.2,0,0,0,0,body);
+
+  // Floating crystal crown
+  const crown=new THREE.Group();crown.position.set(0,3.6,0);g.add(crown);
+  for(let k=0;k<5;k++){
+   const a=k*Math.PI*2/5;
+   mk(new THREE.ConeGeometry(.14,.7,5),crystalMat,Math.cos(a)*.45,0,Math.sin(a)*.45,.3,-a,0,crown);
+  }
+
+  // Floating orbiting crystal blade shards
+  const shards=[];
+  for(let k=0;k<4;k++){
+   const sh=mk(new THREE.ConeGeometry(.18,1.1,4),coreMat,0,0,0);
+   sh.rotation.x=Math.PI/2;
+   shards.push(sh);
+  }
+
+  coreLight=new THREE.PointLight(0x55ccff,1.8,10);
+  coreLight.position.set(0,2.5,0);
+  g.add(coreLight);
+
+  col=circ(gx,gz,1.6,6);
+
+  animParts.push((t,dt)=>{
+   if(G.guardianDefeated){
+    body.position.y=Math.max(.6,body.position.y-dt*.9);
+    crown.position.y=Math.max(1.1,crown.position.y-dt*1.1);
+    coreLight.intensity=Math.max(0,coreLight.intensity-dt*2.5);
+    crystalMat.emissiveIntensity=Math.max(.1,crystalMat.emissiveIntensity-dt*2);
+    return;
+   }
+   body.position.y=2.2+Math.sin(t*2.2)*.15;
+   body.rotation.y+=dt*.6;
+   crown.position.y=3.6+Math.sin(t*2.2+.5)*.12;
+   crown.rotation.y-=dt*.9;
+   heart.rotation.x=t*1.5;
+   heart.rotation.z=t*1.2;
+   for(let k=0;k<4;k++){
+    const a=-t*2.2+k*(Math.PI/2);
+    shards[k].position.set(Math.cos(a)*1.8,2.2+Math.sin(t*3+k)*.4,Math.sin(a)*1.8);
+    shards[k].rotation.y=a+Math.PI/2;
+   }
+   coreLight.intensity=1.8+Math.sin(t*3.5)*.4;
+  });
+
+ }else{
+  // LEVEL 3: Imperial Titan Guardian
+  g.rotation.y=Math.PI*.5;
+  const goldMat=M(0xd4a537,{metalness:.88,roughness:.22,emissive:0x3a2806,emissiveIntensity:.4});
+  const darkArmorMat=M(0x28231c,{metalness:.6,roughness:.4});
+  const coreMat=new THREE.MeshStandardMaterial({color:0xffa033,emissive:0xff7711,emissiveIntensity:1.8,metalness:.4,roughness:.2});
+
+  const mk=(geo,mat,px,py,pz,rx=0,ry=0,rz=0,p=g)=>{
+   const m=new THREE.Mesh(geo,mat);
+   m.position.set(px,py,pz);m.rotation.set(rx,ry,rz);
+   m.castShadow=true;m.receiveShadow=true;
+   p.add(m);return m;
+  };
+
+  // Dais base
+  mk(new THREE.BoxGeometry(2.4,.3,2.4),darkArmorMat,0,.15,0);
+  mk(new THREE.BoxGeometry(2.1,.2,2.1),goldMat,0,.35,0);
+
+  // Titan lower legs
+  mk(new THREE.BoxGeometry(.5,1.4,.6),darkArmorMat,-.55,1.0,0);
+  mk(new THREE.BoxGeometry(.5,1.4,.6),darkArmorMat,.55,1.0,0);
+
+  // Titan Torso & Chestplate
+  const torso=new THREE.Group();torso.position.set(0,2.6,0);g.add(torso);
+  mk(new THREE.BoxGeometry(1.5,1.4,.9),darkArmorMat,0,0,0,0,0,0,torso);
+  mk(new THREE.BoxGeometry(1.6,.7,1.0),goldMat,0,.35,0,0,0,0,torso);
+  mk(new THREE.CylinderGeometry(.32,.32,.12,12),coreMat,0,.3,.52,Math.PI/2,0,0,torso);
+
+  // Titan Head & Helm
+  const head=new THREE.Group();head.position.set(0,3.8,0);g.add(head);
+  mk(new THREE.BoxGeometry(.7,.8,.7),darkArmorMat,0,0,0,0,0,0,head);
+  mk(new THREE.ConeGeometry(.2,.6,4),goldMat,0,.65,0,0,0,0,head);
+  mk(new THREE.BoxGeometry(.5,.12,.1),coreMat,0,.08,.36,0,0,0,head);
+
+  // Heavy Pauldrons
+  mk(new THREE.BoxGeometry(.75,.6,.8),goldMat,-1.15,.6,0,0,0,.25,torso);
+  mk(new THREE.BoxGeometry(.75,.6,.8),goldMat,1.15,.6,0,0,0,-.25,torso);
+
+  // Titan Arms
+  const armL=mk(new THREE.BoxGeometry(.45,1.6,.45),darkArmorMat,-1.15,2.2,0);
+  const armR=mk(new THREE.BoxGeometry(.45,1.6,.45),darkArmorMat,1.15,2.2,0);
+
+  // Imperial Halberd in right hand
+  const halberd=new THREE.Group();halberd.position.set(1.4,2.2,.4);g.add(halberd);
+  mk(new THREE.CylinderGeometry(.06,.06,4.4,8),darkArmorMat,0,.6,0,0,0,0,halberd);
+  mk(new THREE.BoxGeometry(.1,.9,.55),goldMat,0,2.6,.25,0,0,0,halberd);
+  mk(new THREE.ConeGeometry(.12,.8,4),goldMat,0,3.1,0,0,0,0,halberd);
+
+  // Floating Aureole / Halo Ring behind head
+  const halo=mk(new THREE.TorusGeometry(.95,.07,8,24),goldMat,0,3.9,-.45);
+
+  coreLight=new THREE.PointLight(0xffaa33,1.9,10);
+  coreLight.position.set(0,3.0,.9);
+  g.add(coreLight);
+
+  col=box(gx,gz,1.2,1.8,7);
+
+  animParts.push((t,dt)=>{
+   if(G.guardianDefeated){
+    torso.position.y=Math.max(1.3,torso.position.y-dt*.9);
+    head.position.y=Math.max(2.1,head.position.y-dt*1.1);
+    halberd.rotation.z=Math.min(1.2,halberd.rotation.z+dt*1.2);
+    coreLight.intensity=Math.max(0,coreLight.intensity-dt*2.5);
+    coreMat.emissiveIntensity=Math.max(.1,coreMat.emissiveIntensity-dt*2);
+    return;
+   }
+   torso.position.y=2.6+Math.sin(t*1.6)*.06;
+   head.rotation.y=Math.sin(t*.8)*.18;
+   halo.rotation.z+=dt*.6;
+   armR.rotation.x=Math.sin(t*1.2)*.1;
+   halberd.position.y=2.2+Math.sin(t*1.6)*.06;
+   coreLight.intensity=1.9+Math.sin(t*4)*.35;
+  });
+ }
+
+ ANI.push((t,dt)=>{
+  animParts.forEach(fn=>fn(t,dt));
+ });
+
+ return{group:g,col,coreLight,x:gx,z:gz,defeated:false};
+}
+
 /* ===== level building ===== */
 let r=Math.random;
 const KP=[];const free=(x,z,m=5)=>Math.abs(x)>4&&Math.abs(z+10)>3&&KP.every(p=>Math.hypot(x-p[0],z-p[1])>m);
-const INS=[[[-15,8]],[[-17,6],[17,-3]],[[-20,-2],[20,-2],[0,16]]],MP=[[18,-2],[21,5],[-22,10]];
+const INS=[[[-15,8]],[[-17,6],[17,-3]],[[-20,-2],[20,-2],[0,16]]],MP=[[19.0,-2.4],[22.0,3.4],[-23.6,14.5]];
 
 function pts(n,sp,c,s,y0,y1){
  const g=new THREE.BufferGeometry(),a=new Float32Array(n*3);
@@ -640,7 +1283,7 @@ function scatter(n,m,fn,ex){for(let c=0,k=0;c<n&&k<n*12;k++){const x=r()*54-27,z
 
 function build(i){
  const L=LV[i];r=mul(i*77+5);W=new THREE.Group();scene.add(W);COL=[];IT=[];ANI=[];KP.length=0;
- INS[i].forEach(p=>KP.push(p));KP.push(MP[i],[0,24],[0,-10],[0,-15],[0,-20],[0,-22]);
+ INS[i].forEach(p=>KP.push(p));KP.push(MP[i],[0,24],[0,-10],[0,-15],[0,-20],[0,-22],ALTAR_POS[i],GUARD_POS[i]);
  const pal=[
   {bg:0x9ec4a0,fog:.017,gr:0x3e7a45,sun:0xfff0c0,si:1.1,hi:.7},
   {bg:0x07142b,fog:.02,gr:0x1c2c4a,sun:0x6aa0ff,si:.45,hi:.7},
@@ -680,18 +1323,59 @@ function build(i){
   inter(x,z,`Read Inscription: ${f.n}(x)`,()=>{
    const nw=!G.insc.has(k);G.insc.add(k);
    toast(`Inscription: ${f.txt}`);
-   if(nw){sfx('pickup');tm.material.emissiveIntensity=1.4;hudUpd()}
+   if(nw){
+    sfx('pickup');
+    tm.material.emissiveIntensity=1.4;
+    if(G.insc.size===L.fs.length)q('insc');
+    hudUpd();
+   }
   });
  });
 
+ // Central Cipher Altar (decrypt composition to reveal treasure coordinates)
+ G.altar=buildCipherAltar(i);
+ G.altarPos=[G.altar.x,G.altar.z];
+ G.altarLight=G.altar.light;
+ const altarLabels=[
+  'Ancient Cipher Altar — Decrypt Forest Coordinates',
+  'Crystal Cipher Altar — Decrypt Cavern Coordinates',
+  'Vault Cipher Altar — Decrypt Vault Coordinates'
+ ];
+ const altarIt=inter(G.altar.x,G.altar.z,altarLabels[i],()=>{
+  if(G.altarSolved){
+   toast('The Cipher Altar has already been decrypted. Follow the revealed path!','ok');
+   return;
+  }
+  openPuz('altar');
+ },true,{prompt:'Press E to Decrypt',range:3.6,subCls:'ok'});
+ G.altarIt=altarIt;
+
+ // Enemy Guardian (blocks path to treasure chest)
+ G.guardian=buildGuardian(i);
+ G.guardianPos=[G.guardian.x,G.guardian.z];
+ const guardianLabels=[
+  'Forest Stone Guardian — Mathematical Trial',
+  'Crystal Sentinel — Mathematical Trial',
+  'Imperial Titan Guardian — Mathematical Trial'
+ ];
+ const guardianIt=inter(G.guardian.x,G.guardian.z,guardianLabels[i],()=>{
+  if(G.guardianDefeated){
+   toast('The Guardian is deactivated. The way to the chest is clear!','ok');
+   return;
+  }
+  openPuz('guardian');
+ },true,{prompt:'Press E to Challenge',range:3.8,subCls:'warn'});
+ G.guardianIt=guardianIt;
+
  // wooden treasure chest (hidden in progressive secret locations)
  const [mx,mz]=MP[i];
- const chestYaws=[-Math.PI*0.45,-Math.PI*0.5,Math.PI*0.5];
+ const chestYaws=[-Math.PI*0.45,-Math.PI*0.55,Math.PI*0.35];
  const chestCamOffs=[
-  new THREE.Vector3(-2.8,2.4,2.0),
-  new THREE.Vector3(-2.8,2.4,1.8),
-  new THREE.Vector3(3.2,2.6,0.2)
+  new THREE.Vector3(-1.8,1.6,1.4),
+  new THREE.Vector3(-1.5,1.4,1.2),
+  new THREE.Vector3(1.5,1.3,0.9)
  ];
+ const chestRanges=[2.8,2.4,2.1];
  CHEST=buildTreasureChest(mx,mz,i,chestYaws[i],chestCamOffs[i]);
  const chestLabels=[
   'Hidden Forest Chest — Locked (Solve Puzzle)',
@@ -699,17 +1383,27 @@ function build(i){
   'Secret Vault Chest — Locked (Solve Puzzle)'
  ];
  const chestIt=inter(mx,mz,chestLabels[i],()=>{
+  if(!G.altarSolved){
+   sfx('locked');
+   toast('The chest is locked by an ancient cipher. Decrypt the Cipher Altar first!','warn');
+   return;
+  }
+  if(!G.guardianDefeated){
+   sfx('locked');
+   toast('The Guardian bars your access to the chest! Pass the Guardian’s trial first!','warn');
+   return;
+  }
   if(G.chestState==='opened'){toast(`Chest already opened — ${L.kn} already obtained.`);return}
   if(G.chestState==='opening')return;
-  openPuz('main');
- },true,{prompt:'Press E to Interact',range:3.5,subCls:'warn'});
+  openPuz('chest');
+ },true,{prompt:'Press E to Interact',range:chestRanges[i],subCls:'warn'});
  G.chestIt=chestIt;
 
  // chest subtle ambient pulse while locked
  ANI.push((t)=>{
   if(!CHEST)return;
   if(G.chestState==='locked'){
-   CHEST.lockGlow.intensity=.75+Math.sin(t*3)*.25;
+   CHEST.lockGlow.intensity=(.4+Math.sin(t*3)*.15)*(CHEST.sc||1);
   }
  });
 
@@ -807,9 +1501,17 @@ function d0(){
  const cLight=new THREE.PointLight(0xffe277,.8,7);cLight.position.set(9.8,1.1,3.2);W.add(cLight);
  mesh(new THREE.BoxGeometry(.24,.32,.24),M(0xffdf88,{emissive:0xffaa22,emissiveIntensity:1.3}),9.8,1.05,3.2,false);
  // Soft warm illumination inside the nook
- const alcLight=new THREE.PointLight(0xffdf80,.95,9);alcLight.position.set(17.6,2.0,-2.0);W.add(alcLight);
+ const alcLight=new THREE.PointLight(0xffdf80,.55,5.5);alcLight.position.set(17.6,1.8,-2.0);W.add(alcLight);
  // Fireflies floating around the alcove
- pts(36,5,0xd4ff60,.16,.4,3.2);
+ pts(24,4,0xd4ff60,.14,.4,2.8);
+
+ // Natural concealment: weathered fallen trunk, mossy boulders & wild ferns partially screening the chest
+ const log=mesh(new THREE.CylinderGeometry(.2,.26,3.4,7),M(0x4a321e),18.0,.28,-3.4);log.rotation.set(.3,.8,1.35);circ(18.0,-3.4,.4,1.4);
+ mesh(new THREE.DodecahedronGeometry(.65,0),mossRock,20.2,.4,-1.6);circ(20.2,-1.6,.55,1.5);
+ mesh(new THREE.DodecahedronGeometry(.5,0),mossRock,18.1,.3,-3.6);
+ const f1=mesh(new THREE.ConeGeometry(.4,.8,6),M(0x356e30),19.8,.35,-3.0,false);f1.rotation.set(-.3,.5,.2);
+ const f2=mesh(new THREE.ConeGeometry(.35,.7,6),M(0x2d5c28),18.4,.3,-1.7,false);f2.rotation.set(.2,-.4,-.1);
+ mesh(new THREE.BoxGeometry(1.6,.08,1.2),mossRock,19.0,.04,-2.4,false);
 }
 
 function d1(){
@@ -844,8 +1546,18 @@ function d1(){
   const sp=mesh(new THREE.ConeGeometry(.25,.7,5),i%2?crMat1:crMat2,cx,.35,cz,false);sp.rotation.set(i%2?.3:-.2,0,i%2?-.2:.3);
  });
  // Ethereal azure glow inside grotto
- const grottoLight=new THREE.PointLight(0x44c0ff,1.3,9.5);grottoLight.position.set(20.5,2.5,5.0);W.add(grottoLight);
- pts(35,5,0x7be8ff,.15,.5,4.0);
+ const grottoLight=new THREE.PointLight(0x44c0ff,.85,7.0);grottoLight.position.set(20.5,2.5,5.0);W.add(grottoLight);
+ pts(25,4,0x7be8ff,.13,.4,3.5);
+
+ // Natural concealment: staggered crystal spires screening the southeastern recess where chest is tucked
+ const spA=mesh(new THREE.ConeGeometry(.5,3.6,6),crMat1,20.4,1.8,3.9);circ(20.4,3.9,.55,4);
+ const spB=mesh(new THREE.ConeGeometry(.45,2.6,6),rockWallMat,20.8,1.3,2.3);circ(20.8,2.3,.5,3);
+ const spC=mesh(new THREE.ConeGeometry(.35,2.0,5),crMat2,21.3,1.0,4.4);
+ // Subtle crystalline geode vein leading to the recess
+ [[18.6,5.0],[19.6,4.5],[20.6,4.0],[21.4,3.6]].forEach(([vx,vz],vi)=>{
+  const gd=mesh(new THREE.DodecahedronGeometry(.13,0),vi%2?crMat1:crMat2,vx,.07,vz,false);gd.rotation.set(.2,.4,.1);
+ });
+ mesh(new THREE.BoxGeometry(1.3,.1,1.0),M(0x1d2942),22.0,.05,3.4,false);
 }
 
 function d2(){
@@ -885,16 +1597,36 @@ function d2(){
  });
  // Polished gold floor inlay leading from colonnade into the secret chamber
  mesh(new THREE.BoxGeometry(4.2,.05,.8),goldTrimMat,-14.8,.04,10,false);
- const ringMed=new THREE.Mesh(new THREE.RingGeometry(1.2,1.5,32),goldTrimMat);ringMed.rotation.x=-Math.PI/2;ringMed.position.set(-22,.05,10);W.add(ringMed);
+
+ // Grand ceremonial plinth in chamber center (visual misdirection / decoy)
+ mesh(new THREE.CylinderGeometry(1.3,1.6,.35,8),goldTrimMat,-22,.18,10);
+ mesh(new THREE.CylinderGeometry(.7,.9,1.1,8),wallMat,-22,.9,10);
+ mesh(new THREE.CylinderGeometry(1.0,.7,.25,8),goldTrimMat,-22,1.55,10);
+ const seal=mesh(new THREE.OctahedronGeometry(.4,0),M(0xffe280,{metalness:.9,roughness:.15,emissive:0xffbb33,emissiveIntensity:.8}),-22,2.1,10);
+ circ(-22,10,1.3,2.5);
+ ANI.push(t=>{seal.rotation.y=t*.8;seal.position.y=2.1+Math.sin(t*2)*.08});
+
  // Ancient golden urns
  [[-25,4],[-25,16],[-19,4],[-19,16]].forEach(([ux,uz])=>{
   mesh(new THREE.CylinderGeometry(.35,.5,1.2,8),goldTrimMat,ux,.6,uz);
   mesh(new THREE.SphereGeometry(.45,8,8),goldTrimMat,ux,1.2,uz);
   circ(ux,uz,.55,1.8);
  });
- // Sacred treasury warm light
- const vaultLight=new THREE.PointLight(0xffd24c,1.3,11);vaultLight.position.set(-22,3.2,10);W.add(vaultLight);
- pts(30,4.5,0xffd24c,.14,.6,3.5);
+
+ // Natural concealment: northern temple screen wall hiding the petite vault chest
+ mesh(new THREE.BoxGeometry(.4,4.5,2.8),wallMat,-20.6,2.25,14.5);
+ mesh(new THREE.BoxGeometry(.5,.35,3.0),goldTrimMat,-20.6,4.6,14.5);
+ box(-20.6,14.5,.25,1.5,4.5);
+ // Flanking ceremonial mini-urns framing the narrow corridor into the alcove
+ mesh(new THREE.CylinderGeometry(.22,.3,1.0,8),goldTrimMat,-21.4,.5,12.8);circ(-21.4,12.8,.35,1.2);
+ mesh(new THREE.CylinderGeometry(.22,.3,1.0,8),goldTrimMat,-21.4,.5,16.2);circ(-21.4,16.2,.35,1.2);
+ // Subtle chevron inlay leading to the hidden niche
+ mesh(new THREE.BoxGeometry(1.6,.04,.25),goldTrimMat,-22.4,.04,14.5,false);
+ mesh(new THREE.BoxGeometry(1.2,.08,.9),goldTrimMat,-23.6,.04,14.5,false);
+
+ // Sacred treasury ambient illumination (subtle, non-leaking)
+ const vaultLight=new THREE.PointLight(0xffd24c,.95,8.0);vaultLight.position.set(-22,3.0,10);W.add(vaultLight);
+ pts(20,3.5,0xffd24c,.11,.5,3.0);
 }
 
 /* ===== game flow ===== */
@@ -912,9 +1644,15 @@ async function startLevel(i){
   if(!renderer)initThree();pb.style.width='35%';await fr();
   if(W){scene.remove(W);W.traverse(o=>{o.geometry&&o.geometry.dispose();o.material&&[].concat(o.material).forEach(m=>{m.map&&m.map.dispose();m.dispose()})})}
   GATE_T=0;near=null;
-  G={on:true,lv:i,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,cine:0,ct:0,keyGranted:false,advancing:false};
+  G={
+   on:true,lv:i,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,
+   cine:0,ct:0,keyGranted:false,advancing:false,
+   lives:3,levelTimer:LV_TIMES[i],levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,
+   altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}
+  };
   pb.style.width='60%';await fr();
   build(i);pb.style.width='100%';await fr();
+  updateHeartsHUD();
   hudUpd();ui(null);
   const startToasts=[
    'Explore the Forgotten Forest to find the hidden Wooden Treasure Chest!',
@@ -1108,13 +1846,14 @@ function animP(t,dt){
 
 function animChestCine(dt){
  G.ct+=dt;const ct=G.ct;
+ const sc=CHEST.sc||1;
  // 0.0 -> 0.45: Padlock unlocks and drops away
  if(ct<.45){
   const u=ct/.45;
   CHEST.shackle.position.y=.13+u*.16;
   CHEST.padlock.rotation.z=Math.sin(u*14)*.15;
   CHEST.padlock.position.y=CHEST.by+.72-u*.18;
-  CHEST.lockGlow.intensity=1.6+u*1.2;
+  CHEST.lockGlow.intensity=(1.0+u*.8)*sc;
  }else{
   CHEST.padlock.visible=false;
   CHEST.lockGlow.intensity=Math.max(0,CHEST.lockGlow.intensity-dt*3);
@@ -1125,11 +1864,11 @@ function animChestCine(dt){
   const lu=Math.min(1,(ct-.3)/.85);
   const ease=1-Math.pow(1-lu,3);
   CHEST.lid.rotation.x=-1.78*ease;
-  CHEST.innerGlow.intensity=2.4*ease;
+  CHEST.innerGlow.intensity=2.2*ease*sc;
   CHEST.spMat.opacity=lu<1?.95:Math.max(0,.95-(ct-1.15)*.6);
   for(let i=0;i<CHEST.spN;i++){
-   CHEST.spPos[i*3+1]+=dt*(.7+(i%3)*.35);
-   CHEST.spPos[i*3]+=Math.sin(ct*4+i)*dt*.25;
+   CHEST.spPos[i*3+1]+=dt*(.6+(i%3)*.3);
+   CHEST.spPos[i*3]+=Math.sin(ct*4+i)*dt*.2;
   }
   CHEST.sparks.geometry.attributes.position.needsUpdate=true;
  }
@@ -1140,15 +1879,15 @@ function animChestCine(dt){
   if(ct<1.75){
    const ku=(ct-.85)/.9;
    const ke=1-Math.pow(1-ku,2);
-   CHEST.keyMesh.position.set(0,CHEST.by+.45+ke*1.65,0);
-   CHEST.keyMesh.scale.setScalar(.85+ke*.25);
+   CHEST.keyMesh.position.set(0,(CHEST.by+.38)*sc+ke*1.45*sc,0);
+   CHEST.keyMesh.scale.setScalar((.85+ke*.3)*sc);
   }else{
    // 1.75 -> 2.35: Key swoops from chest toward player
    const fu=Math.min(1,(ct-1.75)/.6);
    const fe=fu*fu;
    const dx=P.x-CHEST.x,dz=P.z-CHEST.z,dy=1.45;
-   CHEST.keyMesh.position.set(dx*fe,CHEST.by+2.1+(dy-(CHEST.by+2.1))*fe,dz*fe);
-   CHEST.keyMesh.scale.setScalar(Math.max(.12,1.1*(1-fe*.82)));
+   CHEST.keyMesh.position.set(dx*fe,(CHEST.by+1.83)*sc+(dy-(CHEST.by+1.83)*sc)*fe,dz*fe);
+   CHEST.keyMesh.scale.setScalar(Math.max(.12,1.15*sc*(1-fe*.75)));
   }
  }
  if(ct>=2.35){finishKeyPickup()}
@@ -1158,7 +1897,64 @@ function tick(){
  requestAnimationFrame(tick);if(!renderer)return;
  const dt=Math.min(CL.getDelta(),.05),t=CL.elapsedTime;
  if(G.on){
-  if(ST==='play'||ST==='puz'||G.cine)SV.run.t+=dt;
+  if(ST==='play'||ST==='puz'||G.cine){
+   SV.run.t+=dt;
+   G.levelTimerElapsed=(G.levelTimerElapsed||0)+dt;
+   if(ST==='play'||ST==='puz'){
+    G.levelTimer-=dt;
+    if(G.levelTimer<=0){
+     G.levelTimer=0;
+     deductLife('Level exploration timer expired!');
+     if(G.lives>0){
+      G.levelTimer=LV_TIMES[G.lv];
+      P.x=G.cp.x;P.z=G.cp.z;P.y=0;yaw=G.cp.yaw;
+      toast('Time expired! Respawned at checkpoint (-1 Life).','warn');
+     }
+    }
+   }
+  }
+
+  // Chest Challenge 3-minute timer countdown
+  if(G.inChestChallenge&&ST==='puz'){
+   G.chestTimer-=dt;
+   const pt=$('pz-timer');
+   if(pt){
+    pt.textContent='⏳ '+formatTime(G.chestTimer);
+    pt.classList.toggle('urgent',G.chestTimer<30);
+   }
+   if(G.chestTimer<=0){
+    G.chestTimer=180;
+    deductLife('Chest lock timer expired! Padlock re-sealed.');
+    if(G.lives>0){
+     drawPuz('Timer expired! Chest lock re-sealed (-1 Life).','no');
+    }
+   }
+  }
+
+  // Update HUD timer display
+  const ht=$('hud-timer');
+  if(ht){
+   ht.textContent='⏱️ '+formatTime(G.levelTimer);
+   ht.classList.toggle('urgent',G.levelTimer<60);
+  }
+
+  // Check travel proximity quest
+  if(G.altarSolved&&!G.q.travel&&G.guardianPos){
+   if(Math.hypot(P.x-G.guardianPos[0],P.z-G.guardianPos[1])<7.5){
+    q('travel');
+   }
+  }
+
+  // Guardian alert sound and toast when approaching
+  if(!G.guardianDefeated&&G.guardianPos&&ST==='play'){
+   const gd=Math.hypot(P.x-G.guardianPos[0],P.z-G.guardianPos[1]);
+   if(gd<7.0&&!G.guardianAlerted){
+    G.guardianAlerted=true;
+    sfx('guardianAlert');
+    toast(`${LV[G.lv].n} Guardian awakens! Approach to accept its challenge.`,'warn');
+   }
+  }
+
   if(ST==='play'&&!G.cine&&!G.advancing)move(dt);
   ANI.forEach(f=>f(t,dt));
   animP(t,dt);
@@ -1182,14 +1978,10 @@ function tick(){
    if(GATE_T>=1){GATE_T=1;doorOpened()}
   }
 
-  // Hidden chest discovery & ambient proximity chime
+  // Subtle ambient proximity chime
   if(CHEST&&G.chestState==='locked'&&ST==='play'){
    const cd=Math.hypot(P.x-CHEST.x,P.z-CHEST.z);
    const discRange=[9.0,8.0,7.0][G.lv];
-   if(!G.q.find&&cd<discRange){
-    q('find');
-    sfx('nearChime'+G.lv);
-   }
    if(cd<discRange+3.5){
     if(!G.lastChimeT||t-G.lastChimeT>5.5){
      G.lastChimeT=t;
@@ -1200,8 +1992,8 @@ function tick(){
 
   let tg=new THREE.Vector3(P.x,P.y+1.7,P.z),want;
   if(G.cine&&CHEST){
-   tg.set(CHEST.x,1.35,CHEST.z);
-   const co=CHEST.camOff||new THREE.Vector3(2.6,3.2,4.8);
+   tg.set(CHEST.x,1.0*(CHEST.sc||1),CHEST.z);
+   const co=CHEST.camOff||new THREE.Vector3(2.0,2.2,2.4);
    want=new THREE.Vector3(CHEST.x+co.x,co.y,CHEST.z+co.z);
   }else{
    const cp=Math.cos(pitch);let d=7;
