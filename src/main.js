@@ -2850,11 +2850,32 @@ function tick(){
   const pr=$('pr');
   if(near){
    pr.style.display='block';
-   const h=`<div class="pr-main"><span class="keycap">E</span><b>${near.prompt||'Press E to Interact'}</b></div><span class="pr-sub ${near.subCls||''}">${near.label}</span>`;
-   if(pr.dataset.h!==h){pr.innerHTML=h;pr.dataset.h=h}
+   const isReadyChest=near===G.chestIt&&G.chestState==='READY_TO_OPEN';
+   const h=isReadyChest?
+    `<div class="pr-main"><span class="keycap">E</span><b>Press E or Click to Open Chest</b></div>`+
+    `<div style="margin-top:6px"><button id="btn-open-chest" class="btn-open-chest" style="background:linear-gradient(#ffe066,#d4a537);color:#1c1505;font-weight:bold;font-size:13px;padding:6px 18px;border-radius:6px;border:none;cursor:pointer;box-shadow:0 0 16px rgba(255,224,102,.5)">🔓 OPEN CHEST</button></div>`+
+    `<span class="pr-sub ok">${near.label}</span>`:
+    `<div class="pr-main"><span class="keycap">E</span><b>${near.prompt||'Press E to Interact'}</b></div><span class="pr-sub ${near.subCls||''}">${near.label}</span>`;
+   if(pr.dataset.h!==h){
+    pr.innerHTML=h;pr.dataset.h=h;
+    const btnOpen=$('btn-open-chest');
+    if(btnOpen){
+     btnOpen.onclick=(e)=>{
+      e.stopPropagation();
+      tryInteract();
+     };
+    }
+   }
   }else{pr.style.display='none';pr.dataset.h=''}
  }
  renderer.render(scene,cam);
+}
+
+const prEl=$('pr');
+if(prEl){
+ prEl.onclick=()=>{
+  tryInteract();
+ };
 }
 
 addEventListener('beforeunload',save);

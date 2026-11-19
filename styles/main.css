@@ -26,7 +26,8 @@ button{font:inherit;color:var(--t);background:linear-gradient(#2b4a38,#1a2e22);b
 .kh-slot.cur{border-color:var(--g);color:var(--t)}
 .kh-slot.got{border-color:#ffd24c;background:rgba(201,162,75,.25);color:#ffe494;font-weight:bold}
 #tb{position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;pointer-events:auto}#tb button{padding:6px 12px;font-size:13px}
-#pr{position:absolute;bottom:86px;left:50%;transform:translateX(-50%);display:none;text-align:center;min-width:220px;border-color:#c9a24b99;box-shadow:0 6px 24px #000a}
+#pr{position:absolute;bottom:86px;left:50%;transform:translateX(-50%);display:none;text-align:center;min-width:220px;border-color:#c9a24b99;box-shadow:0 6px 24px #000a;cursor:pointer;pointer-events:auto;user-select:none;transition:box-shadow .2s}
+#pr:hover{box-shadow:0 8px 30px rgba(255,210,76,.35)}
 .pr-main{display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px}
 .keycap{display:inline-block;padding:2px 8px;border-radius:5px;border:1px solid var(--g);background:linear-gradient(#355641,#1c3024);color:#ffe9a8;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;box-shadow:0 2px 0 #0a140e}
 .pr-sub{display:block;font-size:12px;color:#cfc6a6;margin-top:3px}
