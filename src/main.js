@@ -2,13 +2,32 @@
 /* ===== utils & save ===== */
 const $=i=>document.getElementById(i),RI=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const mul=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
-const fresh=()=>({unlocked:1,done:[],frags:[],run:{t:0,h:0},puzzles:generateAllGamePuzzles()});
+function generateChestLocations(){
+ return {
+  0: RI(0, 2),
+  1: RI(0, 2),
+  2: RI(0, 2)
+ };
+}
+
+const fresh=()=>({
+ unlocked: 1,
+ done: [],
+ frags: [],
+ run: { t: 0, h: 0 },
+ puzzles: generateAllGamePuzzles(),
+ chestLocations: generateChestLocations()
+});
 let SV=fresh();
 try{
  const loaded=JSON.parse(localStorage.getItem('ptlc')||'{}');
  SV=Object.assign(fresh(),loaded);
  if(!SV.puzzles||!SV.puzzles[0]||!SV.puzzles[1]||!SV.puzzles[2]){
   SV.puzzles=generateAllGamePuzzles();
+  save();
+ }
+ if(!SV.chestLocations||SV.chestLocations[0]===undefined||SV.chestLocations[1]===undefined||SV.chestLocations[2]===undefined){
+  SV.chestLocations=generateChestLocations();
   save();
  }
 }catch(e){
@@ -254,73 +273,192 @@ function checkValueEquivalence(userInput, targetVal){
  return Math.abs(actual - targetVal) < 1e-4;
 }
 
-function genFunctionValueQuestion(fnName='f',lvIdx=0,role='altar'){
- const aList=[2,3,4,5];
- const a=aList[RI(0,aList.length-1)];
- const bList=[-6,-5,-4,-3,-2,-1,1,2,3,4,5,6];
- const b=bList[RI(0,bList.length-1)];
- const x0=RI(2,6);
- const correctVal=a*x0+b;
+// Composition Question Generator:
+// Level 0 (Level 1): Komposisi 1 fungsi: f(x)
+// Level 1 (Level 2): Komposisi 2 fungsi: f(g(x))
+// Level 2 (Level 3): Komposisi 3 fungsi: f(g(h(x)))
+function genCompositionQuestion(lvIdx=0,role='guardian'){
+ if(lvIdx===0){
+  // LEVEL 1: Komposisi 1 fungsi
+  const a=RI(2,4);
+  const bList=[-5,-4,-3,-2,-1,1,2,3,4,5];
+  const b=bList[RI(0,bList.length-1)];
+  const x0=RI(2,5);
+  const correctVal=a*x0+b;
 
- const fnTxt=formatLinearFn(fnName,a,b);
- const signB=b>=0?`+ ${b}`:`− ${Math.abs(b)}`;
- const promptText=`Jika x = ${x0}, tentukan nilai ${fnName}(x)!`;
- const knownText=`Diketahui fungsi:\n${fnTxt}`;
- const inputPrefix=`${fnName}(${x0}) =`;
- const placeholder=`contoh: ${correctVal}`;
- const correctDisplay=`${fnName}(${x0}) = ${correctVal}`;
+  const fnTxt=formatLinearFn('f',a,b);
+  const signB=b>=0?'+ '+b:'− '+Math.abs(b);
+  const knownText=`Diketahui:\n${fnTxt}`;
+  const promptText=`Jika x = ${x0}, tentukan nilai f(${x0})!`;
+  const inputPrefix=`f(${x0}) =`;
+  const correctDisplay=`f(${x0}) = ${correctVal}`;
 
- const steps=[
-  {num:1,title:'Tuliskan Rumus Fungsi Lengkap',math:`${fnTxt}`,desc:`Fungsi ${fnName}(x) memiliki koefisien a = ${a} dan konstanta b = ${b}.`},
-  {num:2,title:`Substitusikan Nilai x = ${x0}`,math:`${fnName}(${x0}) = ${a}(${x0}) ${signB}`,desc:`Gantikan variabel x pada rumus fungsi dengan nilai yang diberikan yaitu ${x0}.`},
-  {num:3,title:'Lakukan Operasi Perkalian',math:`${a} × ${x0} = ${a*x0}`,desc:`Dahulukan operasi perkalian ${a} dikali ${x0} sesuai urutan operasi matematika.`},
-  {num:4,title:'Lakukan Penjumlahan / Pengurangan',math:`${a*x0} ${signB} = ${correctVal}`,desc:`Hitung hasil akhir dari perkalian ${b>=0?'ditambah '+b:'dikurang '+Math.abs(b)}.`},
-  {num:5,title:'Hasil Akhir Nilai Fungsi',math:`${fnName}(${x0}) = ${correctVal}`,desc:`Nilai dari fungsi ${fnName}(x) untuk x = ${x0} adalah ${correctVal}.`}
- ];
+  const steps=[
+   {num:1,title:'Tuliskan Rumus Fungsi',math:`${fnTxt}`,desc:'Gunakan persamaan fungsi f(x) yang diberikan.'},
+   {num:2,title:`Substitusikan Nilai x = ${x0}`,math:`f(${x0}) = ${a}(${x0}) ${signB}`,desc:`Gantikan setiap variabel x dengan angka ${x0}.`},
+   {num:3,title:'Lakukan Operasi Perkalian',math:`${a} × ${x0} = ${a*x0}`,desc:'Dahulukan operasi perkalian sebelum penjumlahan atau pengurangan.'},
+   {num:4,title:'Operasi Penjumlahan / Pengurangan',math:`${a*x0} ${signB} = ${correctVal}`,desc:'Hitung operasi konstanta untuk mendapatkan nilai akhir.'},
+   {num:5,title:'Hasil Akhir Nilai Fungsi',math:`f(${x0}) = ${correctVal}`,desc:`Maka nilai f(${x0}) adalah ${correctVal}.`}
+  ];
 
- const hints=[
-  `Perhatikan rumus fungsi: ${fnTxt}. Kamu diminta mencari nilai fungsi ketika x = ${x0}.`,
-  `Gantikan x dengan ${x0}: ${fnName}(${x0}) = ${a}(${x0}) ${signB}.`,
-  `Hitung perkalian terlebih dahulu: ${a} × ${x0} = ${a*x0}, lalu ${b>=0?'tambahkan '+b:'kurangkan '+Math.abs(b)}: hasilnya adalah ${correctVal}.`
- ];
+  const hints=[
+   'Perhatikan rumus fungsi f(x). Kamu diminta menghitung nilainya pada nilai x yang sudah diberikan.',
+   'Gantikan variabel x di dalam rumus dengan angka input yang diberikan.',
+   'Dahulukan operasi perkalian koefisien sebelum menjumlahkan atau mengurangkan konstanta.'
+  ];
 
- const titles=role==='altar'?[
-  'Ancient Cipher Altar — Function Evaluation',
-  'Crystal Cipher Altar — Function Evaluation',
-  'Vault Cipher Altar — Function Evaluation'
- ]:[
-  'Forest Stone Guardian — Function Trial',
-  'Crystal Sentinel — Function Trial',
-  'Imperial Titan Guardian — Function Trial'
- ];
+  const titles=role==='guardian'?'Forest Stone Guardian — Function Trial':'Ancient Cipher Altar — Function Evaluation';
+  const lore=role==='guardian'?'“Halt, traveler! The sacred glade demands precision. Evaluate the ancient function, or turn back!”':'';
 
- const lore=role==='guardian'?[
-  '“Halt, traveler! The sacred glade demands precision. Evaluate the ancient function for coordinate x, or turn back!”',
-  '“The crystal harmonics resonate with function values! Calculate the correct frequency output for x, or face expulsion!”',
-  '“By decree of the Vault Architects, compute the exact function value to deactivate the defense matrix!”'
- ]:null;
+  return{
+   type:'composition',
+   kind:role,
+   ansType:'value',
+   compLevel:1,
+   x0,
+   correctVal,
+   fns:[{n:'f',a,b,txt:fnTxt}],
+   fnTxt,
+   knownText,
+   promptText,
+   inputPrefix,
+   placeholder:'Ketik angka hasil perhitungan',
+   correctDisplay,
+   steps,
+   hints,
+   title:titles,
+   lore,
+   fl:promptText,
+   nt:fnTxt,
+   hs:0
+  };
+ }else if(lvIdx===1){
+  // LEVEL 2: Komposisi 2 fungsi: f(g(x))
+  const a2=RI(1,2);
+  const b2=RI(1,4);
+  const x0=RI(1,3);
+  const v1=a2*x0+b2; // g(x0)
 
- return{
-  type:'function',
-  kind:role,
-  ansType:'value',
-  fnName,
-  a,b,x0,
-  correctVal,
-  fnTxt,
-  knownText,
-  promptText,
-  inputPrefix,
-  placeholder,
-  correctDisplay,
-  steps,
-  hints,
-  title:titles[lvIdx]||'Mathematical Challenge',
-  lore:lore?(lore[lvIdx]||''):'',
-  fl:promptText,
-  nt:fnTxt,
-  hs:0
- };
+  const a1=RI(2,3);
+  const b1=RI(-3,3);
+  const v2=a1*v1+b1; // f(g(x0))
+
+  const fTxt=formatLinearFn('f',a1,b1);
+  const gTxt=formatLinearFn('g',a2,b2);
+  const signB1=b1>=0?'+ '+b1:'− '+Math.abs(b1);
+  const signB2=b2>=0?'+ '+b2:'− '+Math.abs(b2);
+
+  const knownText=`Diketahui:\n${fTxt}\n${gTxt}`;
+  const promptText=`Jika x = ${x0}, tentukan nilai f(g(${x0}))!`;
+  const inputPrefix=`f(g(${x0})) =`;
+  const correctDisplay=`f(g(${x0})) = ${v2}`;
+
+  const steps=[
+   {num:1,title:'Identifikasi Urutan Komposisi Fungsi',math:`f(g(${x0}))`,desc:'Untuk menyelesaikan komposisi f(g(x)), hitung fungsi bagian dalam g(x) terlebih dahulu.'},
+   {num:2,title:`Evaluasi Fungsi Terdalam g(${x0})`,math:`g(${x0}) = ${a2}(${x0}) ${signB2} = ${v1}`,desc:`Substitusikan x = ${x0} ke dalam fungsi g(x) sehingga diperoleh g(${x0}) = ${v1}.`},
+   {num:3,title:'Gunakan Hasil g Sebagai Input untuk f',math:`f(g(${x0})) = f(${v1})`,desc:`Masukkan hasil nilai g(${x0}) yaitu ${v1} sebagai input x baru untuk fungsi f(x).`},
+   {num:4,title:`Evaluasi Fungsi Luar f(${v1})`,math:`f(${v1}) = ${a1}(${v1}) ${signB1} = ${a1*v1} ${signB1} = ${v2}`,desc:`Hitung operasi aljabar pada fungsi f(${v1}) untuk memperoleh hasil akhir.`},
+   {num:5,title:'Hasil Akhir Komposisi Dua Fungsi',math:`f(g(${x0})) = ${v2}`,desc:`Maka nilai dari f(g(${x0})) adalah ${v2}.`}
+  ];
+
+  const hints=[
+   'Untuk menyelesaikan f(g(x)), kamu harus mencari nilai fungsi terdalam g(x) terlebih dahulu.',
+   'Setelah memperoleh hasil angka dari g(x), jadikan angka tersebut sebagai input untuk fungsi f(x).',
+   'Dahulukan operasi perkalian sebelum penjumlahan atau pengurangan.'
+  ];
+
+  const titles=role==='guardian'?'Crystal Sentinel — 2-Function Composition Trial':'Crystal Cipher Altar — 2-Function Composition';
+  const lore=role==='guardian'?'“The crystal harmonics resonate with composed frequencies! Compute f(g(x)), or face expulsion!”':'';
+
+  return{
+   type:'composition',
+   kind:role,
+   ansType:'value',
+   compLevel:2,
+   x0,
+   correctVal:v2,
+   fns:[{n:'f',a:a1,b:b1,txt:fTxt},{n:'g',a:a2,b:b2,txt:gTxt}],
+   fnTxt:`${fTxt} | ${gTxt}`,
+   knownText,
+   promptText,
+   inputPrefix,
+   placeholder:'Ketik angka hasil perhitungan',
+   correctDisplay,
+   steps,
+   hints,
+   title:titles,
+   lore,
+   fl:promptText,
+   nt:`${fTxt} | ${gTxt}`,
+   hs:0
+  };
+ }else{
+  // LEVEL 3: Komposisi 3 fungsi: f(g(h(x)))
+  const a3=RI(1,2);
+  const b3=RI(1,3);
+  const x0=RI(1,2);
+  const v1=a3*x0+b3; // h(x0)
+
+  const a2=RI(1,2);
+  const b2=RI(-2,2);
+  const v2=a2*v1+b2; // g(h(x0))
+
+  const a1=RI(2,3);
+  const b1=RI(-2,3);
+  const v3=a1*v2+b1; // f(g(h(x0)))
+
+  const fTxt=formatLinearFn('f',a1,b1);
+  const gTxt=formatLinearFn('g',a2,b2);
+  const hTxt=formatLinearFn('h',a3,b3);
+  const signB1=b1>=0?'+ '+b1:'− '+Math.abs(b1);
+  const signB2=b2>=0?'+ '+b2:'− '+Math.abs(b2);
+  const signB3=b3>=0?'+ '+b3:'− '+Math.abs(b3);
+
+  const knownText=`Diketahui:\n${fTxt}\n${gTxt}\n${hTxt}`;
+  const promptText=`Jika x = ${x0}, tentukan nilai f(g(h(${x0})))!`;
+  const inputPrefix=`f(g(h(${x0}))) =`;
+  const correctDisplay=`f(g(h(${x0}))) = ${v3}`;
+
+  const steps=[
+   {num:1,title:'Identifikasi Urutan Komposisi 3 Fungsi',math:`f(g(h(${x0})))`,desc:'Selesaikan dari fungsi yang paling dalam: h(x), kemudian g(x), lalu fungsi terluar f(x).' },
+   {num:2,title:`Hitung Fungsi Paling Dalam h(${x0})`,math:`h(${x0}) = ${a3}(${x0}) ${signB3} = ${v1}`,desc:`Substitusikan x = ${x0} ke dalam fungsi h(x) sehingga diperoleh hasil ${v1}.`},
+   {num:3,title:`Masukkan Hasil ke Fungsi Tengah g(${v1})`,math:`g(h(${x0})) = g(${v1}) = ${a2}(${v1}) ${signB2} = ${v2}`,desc:`Gunakan hasil ${v1} sebagai input untuk fungsi tengah g(x) sehingga didapat ${v2}.`},
+   {num:4,title:`Masukkan Hasil ke Fungsi Terluar f(${v2})`,math:`f(g(h(${x0}))) = f(${v2}) = ${a1}(${v2}) ${signB1} = ${v3}`,desc:`Gunakan hasil ${v2} sebagai input untuk fungsi terluar f(x) dan hitung hasil akhirnya.`},
+   {num:5,title:'Hasil Akhir Komposisi Tiga Fungsi',math:`f(g(h(${x0}))) = ${v3}`,desc:`Maka nilai dari f(g(h(${x0}))) adalah ${v3}.`}
+  ];
+
+  const hints=[
+   'Kerjakan komposisi 3 fungsi secara bertahap dari bagian yang paling dalam: h(x) lebih dulu.',
+   'Setelah mendapat nilai h(x), masukkan ke fungsi tengah g(x).',
+   'Terakhir, masukkan hasil dari g(x) ke fungsi terluar f(x) untuk mendapatkan jawaban akhir.'
+  ];
+
+  const titles=role==='guardian'?'Imperial Titan Guardian — 3-Function Composition Trial':'Vault Cipher Altar — 3-Function Composition';
+  const lore=role==='guardian'?'“By order of the Ancient Architects, compute the triple composition f(g(h(x))) to deactivate the defense matrix!”':'';
+
+  return{
+   type:'composition',
+   kind:role,
+   ansType:'value',
+   compLevel:3,
+   x0,
+   correctVal:v3,
+   fns:[{n:'f',a:a1,b:b1,txt:fTxt},{n:'g',a:a2,b:b2,txt:gTxt},{n:'h',a:a3,b:b3,txt:hTxt}],
+   fnTxt:`${fTxt} | ${gTxt} | ${hTxt}`,
+   knownText,
+   promptText,
+   inputPrefix,
+   placeholder:'Ketik angka hasil perhitungan',
+   correctDisplay,
+   steps,
+   hints,
+   title:titles,
+   lore,
+   fl:promptText,
+   nt:`${fTxt} | ${gTxt} | ${hTxt}`,
+   hs:0
+  };
+ }
 }
 
 function genChestInverseQuestion(fnName='f',lvIdx=0){
@@ -333,14 +471,15 @@ function genChestInverseQuestion(fnName='f',lvIdx=0){
 
  const fnTxt=formatLinearFn(fnName,a,b);
  const correctFormula=formatLinearInverse(fnName,a,b);
- const signB=b>=0?`+ ${b}`:`− ${Math.abs(b)}`;
- const oppSignB=b>=0?`− ${b}`:`+ ${Math.abs(b)}`;
+ const signB=b>=0?'+ '+b:'− '+Math.abs(b);
+ const oppSignB=b>=0?'− '+b:'+ '+Math.abs(b);
  const aPrefix=a===1?'':`${a}`;
 
  const promptText=`Tentukan invers dari ${fnName}(x), yaitu ${fnName}⁻¹(x)!`;
- const knownText=`Diketahui fungsi:\n${fnTxt}`;
+ const knownText=`Diketahui:\n${fnTxt}`;
  const inputPrefix=`${fnName}⁻¹(x) =`;
- const placeholder=a===1?`contoh: x ${oppSignB}`:`contoh: (x ${oppSignB}) / ${a}`;
+ // SECURITY: Decoupled generic placeholder, never leaks answer!
+ const placeholder='Ketik rumus invers, misal: (x - k) / m';
 
  const steps=[
   {num:1,title:`Ganti ${fnName}(x) dengan Variabel y`,math:`y = ${aPrefix}x ${signB}`,desc:`Tuliskan persamaan fungsi dengan menyatakan output fungsi sebagai variabel y.`},
@@ -350,10 +489,11 @@ function genChestInverseQuestion(fnName='f',lvIdx=0){
   {num:5,title:`Hasil Akhir Rumus Fungsi Invers ${fnName}⁻¹(x)`,math:correctFormula,desc:`Gantikan variabel y dengan lambang invers ${fnName}⁻¹(x). Invers fungsi berhasil ditemukan.`}
  ];
 
+ // SECURITY: Hints teach method, never leak final formula or answer
  const hints=[
-  `Ubah ${fnName}(x) menjadi y, kemudian tukar variabel x dan y: x = ${aPrefix}y ${signB}.`,
-  `Pindahkan konstanta ke ruas x: x ${oppSignB} = ${aPrefix}y.`,
-  `Bagi seluruh ruas kiri dengan koefisien (${a}): ${correctFormula}.`
+  'Ubah notasi fungsi menjadi variabel output y, lalu tukar posisi variabel x dan y.',
+  'Pindahkan konstanta ke ruas yang berlawanan dengan membalik tandanya (+ menjadi −, atau sebaliknya).',
+  'Bagi seluruh ruas dengan koefisien variabel y agar y berdiri sendiri sebagai rumus invers.'
  ];
 
  const titles=[
@@ -387,12 +527,10 @@ function genChestInverseQuestion(fnName='f',lvIdx=0){
 function generateAllGamePuzzles(){
  const puzs={};
  for(let lv=0;lv<3;lv++){
-  const fnAltar=lv===1?'g':'f';
-  const fnGuardian=lv===2?'g':'f';
   const fnChest=lv===2?'g':'f';
   puzs[lv]={
-   altar:genFunctionValueQuestion(fnAltar,lv,'altar'),
-   guardian:genFunctionValueQuestion(fnGuardian,lv,'guardian'),
+   altar:genCompositionQuestion(lv,'altar'),
+   guardian:genCompositionQuestion(lv,'guardian'),
    chest:genChestInverseQuestion(fnChest,lv)
   };
  }
@@ -401,12 +539,12 @@ function generateAllGamePuzzles(){
 
 function mkAltarPuz(lvIdx){
  if(SV.puzzles&&SV.puzzles[lvIdx]&&SV.puzzles[lvIdx].altar)return SV.puzzles[lvIdx].altar;
- return genFunctionValueQuestion(lvIdx===1?'g':'f',lvIdx,'altar');
+ return genCompositionQuestion(lvIdx,'altar');
 }
 
 function mkGuardianPuz(lvIdx){
  if(SV.puzzles&&SV.puzzles[lvIdx]&&SV.puzzles[lvIdx].guardian)return SV.puzzles[lvIdx].guardian;
- return genFunctionValueQuestion(lvIdx===2?'g':'f',lvIdx,'guardian');
+ return genCompositionQuestion(lvIdx,'guardian');
 }
 
 function mkInversePuz(lvIdx){
@@ -446,7 +584,7 @@ setInterval(()=>{if(!AC||mute)return;const l=G.on?G.lv:0,sc=[[220,247,277,330,37
  if(G.on&&Math.random()<.3){if(l==0)tone(RI(2000,3000),.12,'sine',.03,0,RI(1500,2400));else if(l==1)tone(1200,.15,'sine',.05,0,600);else nz(2,.05,200)}},900);
 
 /* ===== state / ui ===== */
-let G={on:false,lv:0,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,cine:0,ct:0,keyGranted:false,advancing:false,lives:3,hp:100,maxHp:100,invulnTimer:0,levelTimer:600,levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}};
+let G={on:false,lv:0,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,cine:0,ct:0,keyGranted:false,advancing:false,lives:3,hp:100,maxHp:100,invulnTimer:0,levelTimer:600,levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,chestChallengeStarted:false,altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}};
 let ST='menu',SB='menu',K={},W=null,COL=[],IT=[],ANI=[],yaw=0,pitch=.35,drag=false,lockT=0;
 let DOOR=null,GC=null,CHEST=null,PG=null,ORB=null,RELIC=null,GATE_T=0;
 let mouseSens=0.0022,camDist=3.8;
@@ -540,6 +678,7 @@ function retryCheckpoint(){
  G.levelTimer=LV_TIMES[G.lv];
  G.chestTimer=180;
  G.inChestChallenge=false;
+ G.chestChallengeStarted=false;
  G.busy=false;
  G.on=true;
  P.x=G.cp.x;P.z=G.cp.z;P.y=0;P.vx=P.vz=P.vy=0;
@@ -620,7 +759,7 @@ function items(){
   }
   [...G.insc].forEach(i=>{
    const f=LV[G.lv].fs[i];
-   a.push({n:'Inscription: '+f.n+'(x)',d:`${f.txt}. Inverse: ${f.invTxt}.`});
+   a.push({n:'Inscription: '+f.n+'(x)',d:`Ancient cipher inscription: ${f.txt}.`});
   });
  }
  SV.frags.forEach(i=>a.push({n:'Treasure Fragment '+['I','II','III'][i],d:['A moss-green shard of the map, found beyond the Forest Door.','A glowing blue shard of the map, pulled from the Crystal Cavern.','The final shard.'][i]}));
@@ -686,7 +825,7 @@ const ACT={
  resume(){resume()},
  restart(){startLevel(G.lv)},
  retry(){retryCheckpoint()},
- replay(){SV.run={t:0,h:0};SV.frags=[];SV.puzzles=generateAllGamePuzzles();save();startLevel(0)},
+ replay(){SV.run={t:0,h:0};SV.frags=[];SV.puzzles=generateAllGamePuzzles();SV.chestLocations=generateChestLocations();save();startLevel(0)},
  claim(){claimTreasure()},
  claimAltar(){claimAltar()},
  claimGuardian(){claimGuardian()}
@@ -710,25 +849,34 @@ function openPuz(kind){
  if(!SV.puzzles||!SV.puzzles[G.lv]){
   SV.puzzles=SV.puzzles||{};
   SV.puzzles[G.lv]={
-   altar:genFunctionValueQuestion(G.lv===1?'g':'f',G.lv,'altar'),
-   guardian:genFunctionValueQuestion(G.lv===2?'g':'f',G.lv,'guardian'),
+   altar:genCompositionQuestion(G.lv,'altar'),
+   guardian:genCompositionQuestion(G.lv,'guardian'),
    chest:genChestInverseQuestion(G.lv===2?'g':'f',G.lv)
   };
   save();
  }
  const pz=SV.puzzles[G.lv][kind];
  if(kind==='chest'){
-  G.inChestChallenge=true;
-  G.chestTimer=180;
+  if(!G.chestChallengeStarted){
+   G.inChestChallenge=false;
+   G.chestTimer=180;
+  }
  }
- G.pz=pz;G.busy=false;ui('puz');drawPuz();setTimeout(()=>$('ans')&&$('ans').focus(),50);
+ G.pz=pz;
+ G.busy=false;
+ ui('puz');
+ drawPuz();
+ if(kind!=='chest'||G.chestChallengeStarted){
+  setTimeout(()=>$('ans')&&$('ans').focus(),50);
+ }
 }
 
 function drawPuz(msg,cls,showExplain=false){
  const pz=G.pz;
  let timerHtml='';
  if(pz.kind==='chest'){
-  timerHtml=`<div class="pz-chest-timer ${G.chestTimer<30?'urgent':''}" id="pz-timer">⏳ ${formatTime(G.chestTimer)}</div>`;
+  const timeStr=G.chestChallengeStarted ? formatTime(G.chestTimer) : '03:00 (Belum dimulai)';
+  timerHtml=`<div class="pz-chest-timer ${G.chestChallengeStarted && G.chestTimer<30?'urgent':''}" id="pz-timer">⏳ ${timeStr}</div>`;
  }
  let guardianHtml='';
  if(pz.kind==='guardian'&&pz.lore){
@@ -736,9 +884,21 @@ function drawPuz(msg,cls,showExplain=false){
  }
 
  // Format known lines cleanly
- const knownLines=(pz.knownText||`Diketahui fungsi:\n${pz.fnTxt}`).split('\n');
+ const knownLines=(pz.knownText||'Diketahui:\n'+(pz.fnTxt||pz.nt)).split('\n');
  const introLine=knownLines[0]||'Diketahui:';
  const mathLines=knownLines.slice(1).map(l=>`<div class="pz-math-display">${l}</div>`).join('');
+
+ let chestStartCard='';
+ const isChestNotStarted = pz.kind==='chest' && !G.chestChallengeStarted;
+ if(isChestNotStarted){
+  chestStartCard=`
+   <div class="pz-explain-card" style="border-color:#ffd24c;text-align:center;margin:12px 0;">
+    <div style="color:#ffe494;font-weight:bold;margin-bottom:6px;">⚠️ TANTANGAN PETI HARTA KARUN · WAKTU TEPAT 03:00</div>
+    <p style="color:#d8cfb4;font-size:13.5px;line-height:1.5;margin:0 0 10px;">Gembok peti dilindungi kunci invers dengan batas waktu 3 menit. Klik tombol di bawah untuk mengaktifkan timer dan membuka kolom jawaban!</p>
+    <button id="btn-start-chest" class="pz-submit-btn" style="background:linear-gradient(#ffe066,#d4a537);color:#1c1505;font-weight:bold;font-size:15px;padding:12px 26px;box-shadow:0 0 20px rgba(255,224,102,.4)">▶ MULAI TANTANGAN (03:00)</button>
+   </div>
+  `;
+ }
 
  const bodyHtml=
   `<div class="pz-math-card">`+
@@ -746,6 +906,8 @@ function drawPuz(msg,cls,showExplain=false){
    mathLines+
    `<p class="pz-math-prompt">${pz.promptText||pz.fl}</p>`+
   `</div>`+
+  chestStartCard+
+  (!isChestNotStarted ?
   `<div class="pz-input-row">`+
    `<span class="pz-input-prefix">${pz.inputPrefix||'Jawaban:'}</span>`+
    `<input type="text" id="ans" class="pz-input-field" placeholder="${pz.placeholder||'ketik jawaban'}" autocomplete="off" spellcheck="false" value="${pz.currentInput||''}">`+
@@ -754,16 +916,43 @@ function drawPuz(msg,cls,showExplain=false){
    `<button id="sb" class="pz-submit-btn">SUBMIT ANSWER</button>`+
    `<button id="hb" ${pz.hs>=3?'disabled':''}>Hint (${pz.hs}/3)</button>`+
    `<button id="cb">Close</button>`+
-  `</div>`;
+  `</div>` :
+  `<div style="text-align:center;margin-top:14px">`+
+   `<button id="cb">Close</button>`+
+  `</div>`);
 
  let explainHtml='';
- if(showExplain&&pz.steps){
-  explainHtml=`<div class="pz-explain-card">`+
-   `<div class="pz-explain-title">💡 Panduan Langkah Konsep Invers:</div>`+
-   `<ol class="pz-step-list">`+
-   pz.steps.slice(0,4).map(s=>`<li><b>${s.title}:</b> <code>${s.math}</code></li>`).join('')+
-   `</ol>`+
-  `</div>`;
+ if(showExplain){
+  if(pz.kind==='chest'){
+   explainHtml=`
+    <div class="pz-explain-card">
+     <div class="pz-explain-title">💡 Panduan Konsep Invers Fungsi:</div>
+     <ol class="pz-step-list">
+      <li><b>Langkah 1:</b> Tuliskan persamaan fungsi dengan menyatakan output sebagai variabel y.</li>
+      <li><b>Langkah 2:</b> Tukar peranan variabel x dan y untuk membentuk relasi invers.</li>
+      <li><b>Langkah 3:</b> Pindahkan suku konstanta ke ruas yang berlawanan dengan membalik tandanya.</li>
+      <li><b>Langkah 4:</b> Bagi kedua ruas dengan angka koefisien variabel y agar y berdiri sendiri.</li>
+     </ol>
+    </div>
+   `;
+  }else{
+   const compDesc = pz.compLevel === 3
+     ? 'Hitung fungsi terdalam h(x) terlebih dahulu, masukkan hasilnya ke g(x), lalu terakhir masukkan ke fungsi terluar f(x).'
+     : (pz.compLevel === 2
+       ? 'Hitung fungsi terdalam g(x) terlebih dahulu, kemudian masukkan hasil nilainya ke fungsi terluar f(x).'
+       : 'Substitusikan nilai x yang diberikan langsung ke dalam rumus fungsi, dahulukan perkalian sebelum penjumlahan.');
+   explainHtml=`
+    <div class="pz-explain-card">
+     <div class="pz-explain-title">💡 Panduan Konsep Komposisi Fungsi:</div>
+     <p class="pz-explain-desc" style="color:#d8cfb4;font-size:13px;line-height:1.5;margin:4px 0 8px;">${compDesc}</p>
+     <ol class="pz-step-list">
+      <li><b>Aturan Operasi:</b> Dahulukan selalu perhitungan fungsi bagian paling dalam.</li>
+      <li><b>Prioritas Aljabar:</b> Selesaikan perkalian koefisien sebelum menambah/mengurangi konstanta.</li>
+      <li><b>Substitusi Bertahap:</b> Nilai hasil dari fungsi dalam menjadi input untuk fungsi berikutnya.</li>
+     </ol>
+    </div>
+   `;
+  }
  }
 
  const tagLabel=pz.kind==='chest'?'Peti Harta Karun':(pz.kind==='guardian'?'Tantangan Guardian':'Cipher Altar');
@@ -778,8 +967,20 @@ function drawPuz(msg,cls,showExplain=false){
   explainHtml+
   `${hintList.slice(0,pz.hs).map((h,i)=>`<div class="hh">Hint ${i+1}: ${h}</div>`).join('')}`;
 
- $('sb').onclick=submit;
- $('hb').onclick=()=>{if(pz.hs<3){pz.hs++;SV.run.h++;drawPuz()}};
+ const btnStartChest=$('btn-start-chest');
+ if(btnStartChest){
+  btnStartChest.onclick=()=>{
+   G.chestChallengeStarted=true;
+   G.inChestChallenge=true;
+   G.chestTimer=180;
+   sfx('lockOpen');
+   drawPuz();
+   setTimeout(()=>$('ans')&&$('ans').focus(),50);
+  };
+ }
+
+ if($('sb'))$('sb').onclick=submit;
+ if($('hb'))$('hb').onclick=()=>{if(pz.hs<3){pz.hs++;SV.run.h++;drawPuz()}};
  $('cb').onclick=()=>{
   if(pz.kind==='chest'){G.inChestChallenge=false}
   ui(null);try{if(cv)cv.requestPointerLock()}catch(e){}
@@ -802,28 +1003,26 @@ function submit(){
  }
 
  let isCorrect=false;
- if(pz.ansType==='formula'){
-  isCorrect=checkInverseEquivalence(raw, pz.a, pz.b);
- }else if(pz.ansType==='value'){
-  isCorrect=checkValueEquivalence(raw, pz.correctVal);
- }else if(pz.type==='inverse'){
+ if(pz.ansType==='formula'||pz.type==='inverse'){
   isCorrect=checkInverseEquivalence(raw, pz.a, pz.b);
  }else{
-  const s=raw.replace(/[−–]/g,'-');
-  if(!/^-?\d+$/.test(s)){
-   sfx('bad');drawPuz('Harap masukkan angka bulat.','no');
-   const p=$('pz');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');
-   setTimeout(()=>$('ans')&&$('ans').focus(),20);return;
-  }
-  if(+s===pz.ans){
-   isCorrect=true;
-  }
+  isCorrect=checkValueEquivalence(raw, pz.correctVal);
  }
 
  if(!isCorrect){
-  damagePlayer(25,pz.kind==='chest'?'Ancient chest defense trap':(pz.kind==='guardian'?'Guardian struck with warding burst':'Incorrect cipher attempt at Altar'));
-  if(G.hp<=0)return;
-  drawPuz('Jawaban belum tepat! Cek konsep langkah penyelesaian di bawah (-25 HP).','no',true);
+  if(pz.kind==='chest'){
+   deductLife('Peti harta karun: Jawaban invers belum tepat.');
+   if(G.lives<=0)return;
+   drawPuz('Jawaban belum tepat! 1 Nyawa berkurang. Periksa konsep langkah pengerjaan di bawah.','no',true);
+  }else if(pz.kind==='guardian'){
+   damagePlayer(25,'Guardian struck with warding burst');
+   if(G.hp<=0)return;
+   drawPuz('Jawaban belum tepat! Cek konsep langkah penyelesaian di bawah (-25 HP).','no',true);
+  }else{
+   damagePlayer(25,'Incorrect cipher attempt at Altar');
+   if(G.hp<=0)return;
+   drawPuz('Jawaban belum tepat! Cek konsep langkah penyelesaian di bawah (-25 HP).','no',true);
+  }
   const p=$('pz');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');
   setTimeout(()=>$('ans')&&$('ans').focus(),20);return;
  }
@@ -856,6 +1055,7 @@ function submit(){
   },600);
  }else{
   G.inChestChallenge=false;
+  G.chestChallengeStarted=false;
   q('inverse');
   $('msg').className='ok';$('msg').textContent='Correct! Lock Decrypted. Solution Walkthrough Loading…';
   setTimeout(()=>{
@@ -908,17 +1108,33 @@ function renderSolutionWalkthrough(pz){
   conceptTitle=`Konsep: Menentukan Rumus Invers Fungsi Linear ${pz.fnName}⁻¹(x)`;
   conceptDesc=`Fungsi invers ${pz.fnName}⁻¹(x) membalikkan relasi pemetaan dari output kembali ke input. Untuk fungsi linear ${pz.fnTxt}, proses aljabar dilakukan secara bertahap: (1) ubah notasi fungsi menjadi variabel y, (2) tukar posisi variabel x dan y, (3) pindahkan konstanta ke ruas berlawanan dengan membalik tandanya, dan (4) bagi kedua ruas dengan koefisien variabel y (${pz.a}) sehingga diperoleh rumus fungsi invers ${pz.correctFormula}.`;
  }else if(pz.kind==='guardian'){
-  subtitle=`GUARDIAN’S TRIAL PASSED · FUNCTION EVALUATION · LEVEL ${lvIdx+1} (${L.n})`;
+  subtitle=`GUARDIAN’S TRIAL PASSED · LEVEL ${lvIdx+1} (${L.n})`;
   actionLabel='APPROACH TREASURE CHEST';
   actionAttr='claimGuardian';
-  conceptTitle=`Konsep: Menghitung Nilai Fungsi Linear ${pz.fnName}(x)`;
-  conceptDesc=`Untuk menentukan nilai fungsi ${pz.fnTxt} pada titik input x = ${pz.x0}, substitusikan nilai x = ${pz.x0} ke dalam rumus fungsi. Dahulukan perkalian koefisien (${pz.a} × ${pz.x0} = ${pz.a*pz.x0}), lalu selesaikan operasi penjumlahan/pengurangan konstanta untuk memperoleh nilai akhir ${pz.correctVal}.`;
+  if(pz.compLevel===1){
+   conceptTitle='Konsep: Evaluasi Nilai Fungsi Tunggal f(x)';
+   conceptDesc=`Substitusikan nilai x = ${pz.x0} ke dalam fungsi ${pz.nt}. Dahulukan perkalian sebelum penjumlahan/pengurangan untuk memperoleh hasil akhir ${pz.correctVal}.`;
+  }else if(pz.compLevel===2){
+   conceptTitle='Konsep: Komposisi Dua Fungsi f(g(x))';
+   conceptDesc=`Untuk menentukan f(g(${pz.x0})), cari terlebih dahulu nilai fungsi bagian dalam g(${pz.x0}), lalu gunakan hasilnya sebagai input variabel x untuk fungsi luar f(x) hingga diperoleh hasil akhir ${pz.correctVal}.`;
+  }else{
+   conceptTitle='Konsep: Komposisi Tiga Fungsi f(g(h(x)))';
+   conceptDesc=`Komposisi berjenjang diselesaikan dari fungsi paling dalam: hitung h(${pz.x0}), masukkan hasilnya ke g(x), lalu masukkan hasilnya ke fungsi terluar f(x) hingga diperoleh hasil akhir ${pz.correctVal}.`;
+  }
  }else{
-  subtitle=`CIPHER DECRYPTED · FUNCTION EVALUATION · LEVEL ${lvIdx+1} (${L.n})`;
+  subtitle=`CIPHER DECRYPTED · LEVEL ${lvIdx+1} (${L.n})`;
   actionLabel='TRAVEL TO TREASURE AREA';
   actionAttr='claimAltar';
-  conceptTitle=`Konsep: Evaluasi Nilai Fungsi Altar ${pz.fnName}(x)`;
-  conceptDesc=`Mendekripsi altar kuno dilakukan dengan mengevaluasi rumus fungsi linear ${pz.fnTxt} pada koordinat x = ${pz.x0}. Substitusikan nilai x = ${pz.x0} ke dalam rumus fungsi dan hitung hasil perkalian serta penjumlahan berurutan hingga menghasilkan nilai ${pz.correctVal}.`;
+  if(pz.compLevel===1){
+   conceptTitle='Konsep: Evaluasi Fungsi Koordinat Altar f(x)';
+   conceptDesc=`Mendekripsi altar kuno dilakukan dengan mengevaluasi rumus fungsi linear pada koordinat x = ${pz.x0} hingga menghasilkan nilai ${pz.correctVal}.`;
+  }else if(pz.compLevel===2){
+   conceptTitle='Konsep: Komposisi Dua Fungsi Koordinat Altar f(g(x))';
+   conceptDesc=`Dekripsi koordinat gua kristal dilakukan dengan menghitung fungsi bagian dalam g(${pz.x0}), lalu memasukkannya ke fungsi luar f(x) hingga menghasilkan nilai ${pz.correctVal}.`;
+  }else{
+   conceptTitle='Konsep: Komposisi Tiga Fungsi Koordinat Vault f(g(h(x)))';
+   conceptDesc=`Dekripsi koordinat vault dilakukan secara berjenjang dari fungsi paling dalam h(${pz.x0}), lalu ke g(x), dan terakhir ke fungsi terluar f(x) hingga menghasilkan nilai ${pz.correctVal}.`;
+  }
  }
 
  const steps=pz.steps||[];
@@ -933,7 +1149,7 @@ function renderSolutionWalkthrough(pz){
   `<div class="sol-card">`+
    `<div class="sol-card-title"><span>📐</span> SOAL & RUMUS MATEMATIKA</div>`+
    `<div class="sol-card-text"><b>Soal:</b> ${pz.promptText||pz.fl}</div>`+
-   `<div class="sol-fns-grid"><span class="sol-fn-badge">${(pz.knownText||pz.fnTxt).replace(/\n/g,' &nbsp;|&nbsp; ')} &nbsp;➜&nbsp; <b style="color:#a2ff9b">${displayVal}</b></span></div>`+
+   `<div class="sol-fns-grid"><span class="sol-fn-badge">${(pz.knownText||pz.fnTxt||pz.nt).replace(/\n/g,' &nbsp;|&nbsp; ')} &nbsp;➜&nbsp; <b style="color:#a2ff9b">${displayVal}</b></span></div>`+
   `</div>`+
   `<div class="sol-card">`+
    `<div class="sol-card-title"><span>💡</span> ${conceptTitle}</div>`+
@@ -1771,9 +1987,10 @@ function build(i){
 
  // wooden treasure chest (hidden in progressive secret locations)
  const spawnList=CHEST_SPAWNS[i];
- const spawnData=spawnList[RI(0,spawnList.length-1)];
+ const spawnIdx=(SV.chestLocations&&SV.chestLocations[i]!==undefined)?(SV.chestLocations[i]%spawnList.length):0;
+ const spawnData=spawnList[spawnIdx];
  const [mx,mz]=spawnData.pos;
- G.chestSpawnIdx=spawnList.indexOf(spawnData);
+ G.chestSpawnIdx=spawnIdx;
  G.chestPos=[mx,mz];
  MP[i]=[mx,mz];
  CHEST=buildTreasureChest(mx,mz,i,spawnData.yaw,spawnData.camOff);
@@ -2052,24 +2269,26 @@ async function startLevel(i){
   if(!SV.puzzles||!SV.puzzles[i]){
    SV.puzzles=SV.puzzles||{};
    SV.puzzles[i]={
-    altar:genFunctionValueQuestion(i===1?'g':'f',i,'altar'),
-    guardian:genFunctionValueQuestion(i===2?'g':'f',i,'guardian'),
+    altar:genCompositionQuestion(i,'altar'),
+    guardian:genCompositionQuestion(i,'guardian'),
     chest:genChestInverseQuestion(i===2?'g':'f',i)
    };
    save();
   }
+  if(!SV.chestLocations||SV.chestLocations[i]===undefined){
+   SV.chestLocations=SV.chestLocations||{};
+   SV.chestLocations[i]=RI(0,2);
+   save();
+  }
   const pzSet=SV.puzzles[i];
-  if(i===0){
-   LV[0].fs=[F(pzSet.chest.fnName,pzSet.chest.a,pzSet.chest.b)];
-  }else if(i===1){
-   LV[1].fs=[F(pzSet.chest.fnName,pzSet.chest.a,pzSet.chest.b),F(pzSet.altar.fnName,pzSet.altar.a,pzSet.altar.b)];
-  }else{
-   LV[2].fs=[F(pzSet.chest.fnName,pzSet.chest.a,pzSet.chest.b),F(pzSet.guardian.fnName,pzSet.guardian.a,pzSet.guardian.b),F(pzSet.altar.fnName,pzSet.altar.a,pzSet.altar.b)];
+  if(pzSet.guardian&&pzSet.guardian.fns){
+   LV[i].fs=pzSet.guardian.fns.map(f=>F(f.n,f.a,f.b));
   }
   G={
    on:true,lv:i,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,
    cine:0,ct:0,keyGranted:false,advancing:false,
-   lives:3,hp:100,maxHp:100,invulnTimer:0,levelTimer:LV_TIMES[i],levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,
+   lives:3,hp:100,maxHp:100,invulnTimer:0,levelTimer:LV_TIMES[i],levelTimerElapsed:0,
+   chestTimer:180,inChestChallenge:false,chestChallengeStarted:false,
    altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}
   };
   pb.style.width='60%';await fr();
@@ -2372,8 +2591,8 @@ function tick(){
    }
   }
 
-  // Chest Challenge 3-minute timer countdown
-  if(G.inChestChallenge&&ST==='puz'){
+  // Chest Challenge 3-minute timer countdown (exact 03:00)
+  if(G.inChestChallenge && G.chestChallengeStarted && ST==='puz'){
    G.chestTimer-=dt;
    const pt=$('pz-timer');
    if(pt){
@@ -2382,9 +2601,11 @@ function tick(){
    }
    if(G.chestTimer<=0){
     G.chestTimer=180;
-    damagePlayer(25,'Chest lock timer expired! Padlock re-sealed.');
-    if(G.hp>0){
-     drawPuz('Timer expired! Chest lock re-sealed (-25 HP).','no');
+    G.inChestChallenge=false;
+    G.chestChallengeStarted=false;
+    deductLife('Waktu 03:00 habis! Gembok peti terkunci kembali.');
+    if(G.lives>0){
+     drawPuz('Waktu 03:00 habis! Satu nyawa berkurang. Silakan tekan tombol Mulai Tantangan untuk mencoba kembali dengan timer baru 03:00.','no');
     }
    }
   }
