@@ -584,7 +584,7 @@ setInterval(()=>{if(!AC||mute)return;const l=G.on?G.lv:0,sc=[[220,247,277,330,37
  if(G.on&&Math.random()<.3){if(l==0)tone(RI(2000,3000),.12,'sine',.03,0,RI(1500,2400));else if(l==1)tone(1200,.15,'sine',.05,0,600);else nz(2,.05,200)}},900);
 
 /* ===== state / ui ===== */
-let G={on:false,lv:0,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,cine:0,ct:0,keyGranted:false,advancing:false,lives:3,hp:100,maxHp:100,invulnTimer:0,levelTimer:600,levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,chestChallengeStarted:false,altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}};
+let G={on:false,lv:0,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'LOCKED',doorState:'locked',solved:false,cine:0,ct:0,keyGranted:false,advancing:false,lives:3,hp:100,maxHp:100,invulnTimer:0,levelTimer:600,levelTimerElapsed:0,chestTimer:180,inChestChallenge:false,chestChallengeStarted:false,altarSolved:false,guardianDefeated:false,guardianAlerted:false,cp:{x:0,z:24,yaw:0}};
 let ST='menu',SB='menu',K={},W=null,COL=[],IT=[],ANI=[],yaw=0,pitch=.35,drag=false,lockT=0;
 let DOOR=null,GC=null,CHEST=null,PG=null,ORB=null,RELIC=null,GATE_T=0;
 let mouseSens=0.0022,camDist=3.8;
@@ -674,13 +674,29 @@ function retryCheckpoint(){
  G.invulnTimer=0;
  updateHeartsHUD();
  updateHealthHUD();
- updateHealthHUD();
  G.levelTimer=LV_TIMES[G.lv];
  G.chestTimer=180;
  G.inChestChallenge=false;
  G.chestChallengeStarted=false;
  G.busy=false;
  G.on=true;
+ G.cine=0;
+ if(CHEST && G.chestState !== 'OPENED'){
+  CHEST.lid.rotation.set(0,0,0);
+  if(CHEST.padlock){
+   CHEST.padlock.visible=true;
+   CHEST.padlock.position.set(0,CHEST.by+0.72,0.86);
+   CHEST.padlock.rotation.set(0,0,0);
+   CHEST.shackle.position.set(0,0.13,0);
+  }
+  if(CHEST.lockGlow)CHEST.lockGlow.intensity=0.45*(CHEST.sc||1);
+  if(CHEST.innerGlow)CHEST.innerGlow.intensity=0;
+  if(CHEST.spMat)CHEST.spMat.opacity=0;
+  if(CHEST.keyMesh)CHEST.keyMesh.visible=false;
+  if(G.chestState==='CHALLENGE_ACTIVE')G.chestState='CLOSED';
+  if(G.chestState==='OPENING')G.chestState='READY_TO_OPEN';
+  if(typeof updateChestAccessState==='function')updateChestAccessState();
+ }
  P.x=G.cp.x;P.z=G.cp.z;P.y=0;P.vx=P.vz=P.vy=0;
  yaw=G.cp.yaw;pitch=0.35;
  camDist=3.8;
@@ -775,7 +791,8 @@ function renderInv(){
 function hudUpd(){
  if(!G.on)return;
  const L=LV[G.lv],o=QD[G.lv].find(([k])=>!G.q[k]);
- const chOk=G.chestState==='opened',kyOk=!!(G.hasKey&&G.keys[G.lv]),drOk=G.doorState==='unlocked';
+ const chOk=G.chestState==='OPENED'||G.chestState==='opened';
+ const kyOk=!!(G.hasKey&&G.keys[G.lv]),drOk=G.doorState==='unlocked';
  updateHeartsHUD();
  updateHealthHUD();
  const ht=$('hud-timer');
@@ -783,12 +800,14 @@ function hudUpd(){
   ht.textContent='⏱️ '+formatTime(G.levelTimer);
   ht.classList.toggle('urgent',G.levelTimer<60);
  }
+ const chestPillLabel=chOk?'Opened':(G.chestState==='READY_TO_OPEN'?'Ready to Open':(G.chestState==='CLOSED'?'Accessible':'Locked'));
+ const chestPillCls=chOk?'ok':(G.chestState==='READY_TO_OPEN'?'ok':(G.chestState==='CLOSED'?'warn':'lk'));
  $('obj').innerHTML=
   `<b>Level ${G.lv+1} — ${L.n}</b><br>${o?'Objective: '+o[1]:'All objectives complete'}`+
   `<div class="st-row">`+
   `<span class="pill ${G.altarSolved?'ok':'lk'}">Altar: ${G.altarSolved?'Deciphered':'Sealed'}</span>`+
   `<span class="pill ${G.guardianDefeated?'ok':'lk'}">Guardian: ${G.guardianDefeated?'Defeated':'Active'}</span>`+
-  `<span class="pill ${chOk?'ok':'lk'}">Chest: ${chOk?'Opened':'Locked'}</span>`+
+  `<span class="pill ${chestPillCls}">Chest: ${chestPillLabel}</span>`+
   `<span class="pill ${kyOk?'ok':'lk'}">Key: ${kyOk?'1/1':'0/1'}</span>`+
   `<span class="pill ${drOk?'ok':'lk'}">Door: ${drOk?'Open':'Locked'}</span>`+
   `</div>`;
@@ -826,7 +845,8 @@ const ACT={
  restart(){startLevel(G.lv)},
  retry(){retryCheckpoint()},
  replay(){SV.run={t:0,h:0};SV.frags=[];SV.puzzles=generateAllGamePuzzles();SV.chestLocations=generateChestLocations();save();startLevel(0)},
- claim(){claimTreasure()},
+ claim(){readyChestToOpen()},
+ readyChest(){readyChestToOpen()},
  claimAltar(){claimAltar()},
  claimGuardian(){claimGuardian()}
 };
@@ -838,7 +858,16 @@ document.addEventListener('click',e=>{
  else ACT[a]&&ACT[a]();
 });
 function pause(){if(ST!=='play')return;save();ui('pause')}
-function resume(){if(!G.on)return ui('menu');ui(null);try{if(cv)cv.requestPointerLock()}catch(e){}}
+function resume(){
+ if(!G.on)return ui('menu');
+ if(G.chestState==='CHALLENGE_ACTIVE'){
+  G.chestState='CLOSED';
+  G.inChestChallenge=false;
+  if(typeof updateChestAccessState==='function')updateChestAccessState();
+ }
+ ui(null);
+ try{if(cv)cv.requestPointerLock()}catch(e){}
+}
 $('vm').oninput=e=>{vm=+e.target.value;vol()};
 $('vu').oninput=e=>{vu=+e.target.value;vol()};
 $('mu').onchange=e=>{mute=e.target.checked;vol()};
@@ -857,6 +886,7 @@ function openPuz(kind){
  }
  const pz=SV.puzzles[G.lv][kind];
  if(kind==='chest'){
+  G.chestState='CHALLENGE_ACTIVE';
   if(!G.chestChallengeStarted){
    G.inChestChallenge=false;
    G.chestTimer=180;
@@ -982,7 +1012,13 @@ function drawPuz(msg,cls,showExplain=false){
  if($('sb'))$('sb').onclick=submit;
  if($('hb'))$('hb').onclick=()=>{if(pz.hs<3){pz.hs++;SV.run.h++;drawPuz()}};
  $('cb').onclick=()=>{
-  if(pz.kind==='chest'){G.inChestChallenge=false}
+  if(pz.kind==='chest'){
+   G.inChestChallenge=false;
+   if(G.chestState==='CHALLENGE_ACTIVE'){
+    G.chestState='CLOSED';
+    if(typeof updateChestAccessState==='function')updateChestAccessState();
+   }
+  }
   ui(null);try{if(cv)cv.requestPointerLock()}catch(e){}
  };
  const ansEl=$('ans');
@@ -1056,6 +1092,7 @@ function submit(){
  }else{
   G.inChestChallenge=false;
   G.chestChallengeStarted=false;
+  G.chestState='ANSWER_CORRECT';
   q('inverse');
   $('msg').className='ok';$('msg').textContent='Correct! Lock Decrypted. Solution Walkthrough Loading…';
   setTimeout(()=>{
@@ -1066,25 +1103,68 @@ function submit(){
  }
 }
 
-function claimTreasure(){
+function updateChestAccessState(){
+ if(!CHEST)return;
+ if(G.chestState==='OPENED'||G.chestState==='OPENING'||G.chestState==='READY_TO_OPEN'||G.chestState==='ANSWER_CORRECT')return;
+ if(G.altarSolved && G.guardianDefeated){
+  G.chestState='CLOSED';
+  if(G.chestIt){
+   G.chestIt.label='Wooden Treasure Chest — Accessible';
+   G.chestIt.prompt='Press E to Unlock Chest';
+   G.chestIt.subCls='ok';
+  }
+ }else{
+  G.chestState='LOCKED';
+  if(G.chestIt){
+   const chestLabels=[
+    'Hidden Forest Chest — Locked (Solve Puzzle)',
+    'Hidden Crystal Chest — Locked (Solve Puzzle)',
+    'Secret Vault Chest — Locked (Solve Puzzle)'
+   ];
+   G.chestIt.label=chestLabels[G.lv]||'Wooden Treasure Chest — Locked';
+   G.chestIt.prompt='Press E to Interact';
+   G.chestIt.subCls='warn';
+  }
+ }
+}
+
+function readyChestToOpen(){
  ui(null);
  try{if(cv)cv.requestPointerLock()}catch(e){}
- beginChestOpen();
+ G.chestState='READY_TO_OPEN';
+ if(CHEST){
+  CHEST.lid.rotation.set(0,0,0);
+  if(CHEST.padlock)CHEST.padlock.visible=true;
+ }
+ if(G.chestIt){
+  G.chestIt.label='Wooden Treasure Chest — Ready to Open';
+  G.chestIt.prompt='Press E to Open Chest';
+  G.chestIt.subCls='ok';
+ }
+ toast('Padlock Decrypted! Approach the Wooden Treasure Chest and press [E] to open it.','ok');
+ hudUpd();
+}
+
+function claimTreasure(){
+ readyChestToOpen();
 }
 
 function claimAltar(){
  ui(null);
  try{if(cv)cv.requestPointerLock()}catch(e){}
+ G.altarSolved=true;
  sfx('ok');
  if(G.altarLight)G.altarLight.intensity=2.8;
  toast('Coordinates Decrypted! Follow the pathway toward the Guardian.','ok');
  if(G.altarPos)updateCheckpoint(G.altarPos[0],G.altarPos[1],0);
+ updateChestAccessState();
  hudUpd();
 }
 
 function claimGuardian(){
  ui(null);
  try{if(cv)cv.requestPointerLock()}catch(e){}
+ G.guardianDefeated=true;
  sfx('guardianDefeat');
  if(G.guardian){
   if(G.guardian.col)G.guardian.col.off=true;
@@ -1094,6 +1174,7 @@ function claimGuardian(){
  if(G.guardianIt)G.guardianIt.on=false;
  toast('Guardian Deactivated! The Wooden Treasure Chest is accessible.','ok');
  if(G.guardianPos)updateCheckpoint(G.guardianPos[0],G.guardianPos[1],0);
+ updateChestAccessState();
  hudUpd();
 }
 
@@ -1103,8 +1184,8 @@ function renderSolutionWalkthrough(pz){
 
  if(pz.kind==='chest'){
   subtitle=`SOLUTION WALKTHROUGH · INVERSE FUNCTION CIPHER · LEVEL ${lvIdx+1} (${L.n})`;
-  actionLabel='CLAIM YOUR TREASURE';
-  actionAttr='claim';
+  actionLabel='PROCEED TO CHEST';
+  actionAttr='readyChest';
   conceptTitle=`Konsep: Menentukan Rumus Invers Fungsi Linear ${pz.fnName}⁻¹(x)`;
   conceptDesc=`Fungsi invers ${pz.fnName}⁻¹(x) membalikkan relasi pemetaan dari output kembali ke input. Untuk fungsi linear ${pz.fnTxt}, proses aljabar dilakukan secara bertahap: (1) ubah notasi fungsi menjadi variabel y, (2) tukar posisi variabel x dan y, (3) pindahkan konstanta ke ruas berlawanan dengan membalik tandanya, dan (4) bagi kedua ruas dengan koefisien variabel y (${pz.a}) sehingga diperoleh rumus fungsi invers ${pz.correctFormula}.`;
  }else if(pz.kind==='guardian'){
@@ -1181,7 +1262,7 @@ function renderSolutionWalkthrough(pz){
   b.onclick=()=>{
    if(actionAttr==='claimAltar')claimAltar();
    else if(actionAttr==='claimGuardian')claimGuardian();
-   else claimTreasure();
+   else readyChestToOpen();
   };
  }
  setTimeout(()=>{if($('btn-claim'))$('btn-claim').focus()},60);
@@ -1333,6 +1414,7 @@ function buildTreasureChest(x,z,levelIdx,yaw=0,camOff=null){
  // arched barrel lid pivoting at rear hinge (0, by+0.96, -0.75)
  const lid=new THREE.Group();
  lid.position.set(0,by+.96,-.75);
+ lid.rotation.set(0,0,0);
  boxGroup.add(lid);
 
  // half-cylinder barrel arch centered at (0, 0, +0.75) inside lid group
@@ -2000,27 +2082,18 @@ function build(i){
   'Secret Vault Chest — Locked (Solve Puzzle)'
  ];
  const chestIt=inter(mx,mz,chestLabels[i],()=>{
-  if(!G.altarSolved){
-   sfx('locked');
-   toast('The chest is locked by an ancient cipher. Decrypt the Cipher Altar first!','warn');
-   return;
-  }
-  if(!G.guardianDefeated){
-   sfx('locked');
-   toast('The Guardian bars your access to the chest! Pass the Guardian’s trial first!','warn');
-   return;
-  }
-  if(G.chestState==='opened'){toast(`Chest already opened — ${L.kn} already obtained.`);return}
-  if(G.chestState==='opening')return;
-  openPuz('chest');
+  handleChestInteraction();
  },true,{prompt:'Press E to Interact',range:spawnData.range,subCls:'warn'});
  G.chestIt=chestIt;
+ updateChestAccessState();
 
- // chest subtle ambient pulse while locked
+ // chest subtle ambient pulse while locked or ready to open
  ANI.push((t)=>{
   if(!CHEST)return;
-  if(G.chestState==='locked'){
+  if(G.chestState==='LOCKED'||G.chestState==='CLOSED'||G.chestState==='locked'){
    CHEST.lockGlow.intensity=(.4+Math.sin(t*3)*.15)*(CHEST.sc||1);
+  }else if(G.chestState==='READY_TO_OPEN'){
+   CHEST.lockGlow.intensity=(.85+Math.sin(t*7)*.3)*(CHEST.sc||1);
   }
  });
 
@@ -2285,7 +2358,7 @@ async function startLevel(i){
    LV[i].fs=pzSet.guardian.fns.map(f=>F(f.n,f.a,f.b));
   }
   G={
-   on:true,lv:i,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'locked',doorState:'locked',solved:false,
+   on:true,lv:i,q:{},insc:new Set(),keys:{},hasKey:false,chestState:'LOCKED',doorState:'locked',solved:false,
    cine:0,ct:0,keyGranted:false,advancing:false,
    lives:3,hp:100,maxHp:100,invulnTimer:0,levelTimer:LV_TIMES[i],levelTimerElapsed:0,
    chestTimer:180,inChestChallenge:false,chestChallengeStarted:false,
@@ -2294,7 +2367,7 @@ async function startLevel(i){
   pb.style.width='60%';await fr();
   build(i);pb.style.width='100%';await fr();
   updateHeartsHUD();
- updateHealthHUD();
+  updateHealthHUD();
   hudUpd();ui(null);
   const startToasts=[
    'Explore the Forgotten Forest to find the hidden Wooden Treasure Chest!',
@@ -2308,12 +2381,48 @@ async function startLevel(i){
  }
 }
 
+function handleChestInteraction(){
+ const L=LV[G.lv];
+ if(!G.altarSolved){
+  sfx('locked');
+  toast('The chest is locked by an ancient cipher. Decrypt the Cipher Altar first!','warn');
+  return;
+ }
+ if(!G.guardianDefeated){
+  sfx('locked');
+  toast('The Guardian bars your access to the chest! Pass the Guardian’s trial first!','warn');
+  return;
+ }
+ if(G.chestState==='OPENED'||G.chestState==='opened'){
+  toast(`Chest already opened — ${L.kn} already obtained.`);
+  return;
+ }
+ if(G.chestState==='OPENING'||G.chestState==='opening')return;
+ if(G.chestState==='READY_TO_OPEN'){
+  beginChestOpen();
+  return;
+ }
+ G.chestState='CHALLENGE_ACTIVE';
+ openPuz('chest');
+}
+
 function beginChestOpen(){
- if(G.chestState!=='locked')return;
- G.solved=true;G.chestState='opening';G.cine=1;G.ct=0;
- G.lockPopped=false;G.chestSounded=false;G.keyRevealed=false;G.keyFlying=false;G.keyGranted=false;
+ if(G.chestState!=='READY_TO_OPEN')return;
+ G.solved=true;
+ G.chestState='OPENING';
+ G.cine=1;
+ G.ct=0;
+ G.lockPopped=false;
+ G.chestSounded=false;
+ G.keyRevealed=false;
+ G.keyFlying=false;
+ G.keyGranted=false;
  q('chest');
  sfx('lockOpen');
+ if(G.chestIt){
+  G.chestIt.label='Wooden Treasure Chest — Opening…';
+  G.chestIt.prompt='Opening…';
+ }
 }
 
 function finishKeyPickup(){
@@ -2322,10 +2431,11 @@ function finishKeyPickup(){
  CHEST.keyMesh.visible=false;
  G.hasKey=true;
  G.keys[G.lv]=true;
- G.chestState='opened';
+ G.chestState='OPENED';
  G.cine=0;
  if(G.chestIt){
   G.chestIt.label=`Wooden Treasure Chest — Opened (${LV[G.lv].kn} Obtained)`;
+  G.chestIt.prompt='Chest Opened';
   G.chestIt.subCls='ok';
  }
  if(G.doorIt){
@@ -2418,7 +2528,13 @@ addEventListener('keydown',e=>{
   if(ST==='play')pause();else if(['puz','inv','quest','pause'].includes(ST))resume();
   return;
  }
- if(ST==='sol'&&(c==='Enter'||c==='Space')){e.preventDefault();claimTreasure();return}
+ if(ST==='sol'&&(c==='Enter'||c==='Space')){
+  e.preventDefault();
+  const btn=$('btn-claim');
+  if(btn)btn.click();
+  else ui(null);
+  return;
+ }
  if(['inv','quest'].includes(ST)&&(c==='KeyI'||c==='KeyQ')){resume();return}
  if(ST!=='play')return;
  if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(c)){K[c]=1;e.preventDefault()}
@@ -2651,7 +2767,7 @@ function tick(){
   }
 
   // Subtle ambient proximity chime
-  if(CHEST&&G.chestState==='locked'&&ST==='play'){
+  if(CHEST&&(G.chestState==='LOCKED'||G.chestState==='CLOSED'||G.chestState==='READY_TO_OPEN'||G.chestState==='locked')&&ST==='play'){
    const cd=Math.hypot(P.x-CHEST.x,P.z-CHEST.z);
    const discRange=[9.0,8.0,7.0][G.lv];
    if(cd<discRange+3.5){
